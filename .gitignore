@@ -1,0 +1,31 @@
+# Build directories
+build/
+raytracer/build/
+CMakeFiles/
+raytracer/CMakeFiles/
+
+# CMake generated files
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+raytracer/Makefile
+raytracer/cmake_install.cmake
+
+# Compiled output
+*.so
+*.a
+*.o
+*.out
+
+# Animation output
+Animation
+pictures/
+*.gif
+*.bmp
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
