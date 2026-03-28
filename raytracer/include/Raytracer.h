@@ -24,6 +24,7 @@
 #include "Source.h"
 
 #include <thread>
+#include "Magick++.h"
 using namespace std;
   
 struct RGBType {

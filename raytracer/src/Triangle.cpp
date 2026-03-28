@@ -163,63 +163,26 @@ double Triangle::findIntersection(Ray ray) {
         return -1;
     }
     else {
-        //get distance
-         ////
-    Vect v0v1 = B.add(A.negative()); 
-    Vect v0v2 = C.add(A.negative()); 
-    Vect pvec = ray.getDirection().crossProduct(v0v2); 
-    float det = v0v1.dotProduct(pvec); 
-/////
+        // Möller–Trumbore intersection
+        Vect v0v1 = B.add(A.negative());
+        Vect v0v2 = C.add(A.negative());
+        Vect pvec = ray.getDirection().crossProduct(v0v2);
+        double det = v0v1.dotProduct(pvec);
 
-    // if the determinant is negative the triangle is backfacing
-    // if the determinant is close to 0, the ray misses the triangle
-    if (det < .0000000000000000000000000001) return -1; 
+        if (fabs(det) < 1e-8) return -1;
 
-    // ray and triangle are parallel if det is close to 0
-    if (fabs(det) < .00000000000000000000000000001) return -1; 
+        double invDet = 1.0 / det;
 
-    float invDet = 1 / det; 
- 
-    Vect tvec = ray.getOrigin().add(A.negative()); 
-    float u = tvec.dotProduct(pvec) * invDet; 
-    if (u < 0 || u > 1) return -1; 
- 
-    Vect qvec = tvec.crossProduct(v0v1); 
-    float v = ray.getDirection().dotProduct(qvec) * invDet; 
-    if (v < 0 || u + v > 1) return -1; 
-    
+        Vect tvec = ray.getOrigin().add(A.negative());
+        double u = tvec.dotProduct(pvec) * invDet;
+        if (u < -1e-6 || u > 1 + 1e-6) return -1;
 
+        Vect qvec = tvec.crossProduct(v0v1);
+        double v = ray.getDirection().dotProduct(qvec) * invDet;
+        if (v < -1e-6 || u + v > 1 + 1e-6) return -1;
 
-
-
-        double b = normal.dotProduct(ray.getOrigin().add(normal.mult(distance).negative()));
-        double distance_to_plane = -1*b/a;
-        //get point of intersection
-        double Qx = ray_direction.mult(distance_to_plane).getX() + ray_origin.getX();
-        double Qy = ray_direction.mult(distance_to_plane).getY() + ray_origin.getY();
-        double Qz = ray_direction.mult(distance_to_plane).getZ() + ray_origin.getZ();
-        Vect Q (Qx, Qy, Qz);
-        //do tests
-        Vect CA (C.getX()- A.getX(),C.getY()- A.getY(), C.getZ()- A.getZ()); 
-        Vect QA (Q.getX()- A.getX(),Q.getY()- A.getY(), Q.getZ()- A.getZ()); 
-        double test1 = (CA.crossProduct(QA)).dotProduct(normal);
-
-        Vect BC (B.getX()- C.getX(),B.getY()- C.getY(), B.getZ()- C.getZ()); 
-        Vect QC (Q.getX()- C.getX(),Q.getY()- C.getY(), Q.getZ()- C.getZ()); 
-        double test2 = (BC.crossProduct(QC)).dotProduct(normal);
-
-        Vect AB (A.getX()- B.getX(), A.getY()- B.getY(), A.getZ()- B.getZ()); 
-        Vect QB (Q.getX()- B.getX(),Q.getY()- B.getY(), Q.getZ()- B.getZ()); 
-        double test3 = (AB.crossProduct(QB)).dotProduct(normal);
-      
-
-        if(test1 >= 0 && test2 >= 0 && test3 >= 0){
-      
-            return distance_to_plane;
-        }
-        else{
-            return -1;
-        }
+        double t = v0v2.dotProduct(qvec) * invDet;
+        return t;
     }
 }
 

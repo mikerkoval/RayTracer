@@ -1,5 +1,6 @@
 #include "Pyramid.h"
 #include "Raytracer.h"
+#include "Matrix4x4.h"
 #include <iostream>
 using namespace std;
 bool Pyramid::pointInTriangle(Triangle t, Vect p){
@@ -41,8 +42,9 @@ void Pyramid::createPyramid(){
     corners.push_back(base_center);
     corners.push_back(top);
     double amnt = 6.28318 / sides;
+    double offset = amnt / 2.0;
     for (int i = 0; i < sides; i++){
-        Vect c = Vect(cx+ radius*cos(amnt*i), cy, cz+ radius*sin(amnt*i));
+        Vect c = Vect(cx+ radius*cos(amnt*i + offset), cy, cz+ radius*sin(amnt*i + offset));
         corners.push_back(c);
     }
     for (int i = 0; i < corners.size(); i++){
@@ -57,11 +59,10 @@ void Pyramid::createPyramid(){
         }
         Vect* corner1 = &corners[i1];
         Vect* corner2 = &corners[i2];
-        Triangle t1 = Triangle(&corners[0], corner1, corner2, color);
+        Triangle t1 = Triangle(&corners[0], corner2, corner1, color); // downward-facing base cap
         Triangle t2 = Triangle(&corners[1], corner1, corner2, color);
 
         triangleOs.push_back(t1);
-
         triangleOs.push_back(t2);
         
     }
@@ -72,45 +73,41 @@ void Pyramid::createPyramid(){
     
 }
 Color Pyramid::getColor(){return color;}
+Color Pyramid::getColor(Vect p){return color;}
 Vect Pyramid::getNormalAt(Vect point){
-    for (int index = 0; index < triangles.size(); index++) {
-        Triangle* op  =  triangles.at(index);
-        Triangle o = *op;
-        if(pointInTriangle(o, point)){
-            return o.getNormalAt(point);
-        }
+    // Use last_hit_index set by findIntersection — side triangles are at odd indices.
+    // Compute the outward normal directly from the triangle's geometry.
+    int i = last_hit_index;
+    if (i >= 0 && i < (int)triangles.size()) {
+        return triangles.at(i)->getTriangleNormal();
     }
-    return Vect(0,0,0);
+    return triangles.at(1)->getTriangleNormal();
 }
 double Pyramid::findIntersection(Ray ray) {
-
-    
-    vector<double> intersections;      
-    
+    vector<double> intersections;
     for (int index = 0; index < triangles.size(); index++) {
-        Triangle* op  =  triangles.at(index);
-        Triangle o = *op;
-        Vect a = o.getC();
-
-        intersections.push_back(o.findIntersection(ray));   
+        double t = triangles.at(index)->findIntersection(ray);
+        intersections.push_back(t > 0.01 ? t : -1);
     }
-
     int index_of_winning_object = Raytracer::closestObjectIndex(intersections);
-
-    if(index_of_winning_object >= 0){
-   
+    if (index_of_winning_object >= 0) {
+        last_hit_index = index_of_winning_object;
         return intersections.at(index_of_winning_object);
-    } 
+    }
     return -1;
+}
+void Pyramid::translate(Vect v){
+    center = center.add(v);
+    for (int index = 0; index < triangleOs.size(); index++) {
+        triangleOs.at(index).translate(v);
+    }
 }
 void Pyramid::rotate(Matrix r){
     for (int index = 0; index < triangles.size(); index++) {
-        Vect A = triangles.at(index)->getA();
-        Vect B = triangleOs.at(index).getA();
-
         triangles.at(index)->rotate(r);
-    
     }
+    Matrix4x4 m(r);
+    center = m.mult(center);
 }
 
 
@@ -122,6 +119,7 @@ Pyramid::Pyramid(){
     sides = 3;
     radius = 1;
     height = 1;
+    last_hit_index = 0;
     createPyramid();
 }
 
@@ -131,5 +129,6 @@ Pyramid::Pyramid(Vect position, double s , double r, double h, Color col){
     radius = r;
     height = h;
     color = col;
+    last_hit_index = 0;
     createPyramid();
 }

@@ -18,6 +18,7 @@ class Cone: public Object{
 
     Cone();
     Cone(Color c);
+    Cone(double min, double max, Color c);
 
 
     //method functions
@@ -25,6 +26,7 @@ class Cone: public Object{
     Vect  getCenter();
     double getRadius();
     Color getColor();
+    virtual Color getColor(Vect p);
 
     virtual Vect getNormalAt(Vect point);
     virtual double findIntersection(Ray ray) ;

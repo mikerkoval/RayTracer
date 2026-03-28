@@ -4,313 +4,196 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <cmath>
 using namespace std;
 
-void split(const std::string &s, char delim, std::vector<std::string> &elems) {
-    std::stringstream ss;
-    ss.str(s);
-    std::string item;
-    while (std::getline(ss, item, delim)) {
-        elems.push_back(item);
+// ---- string helpers ----
+static vector<string> split(const string& s, char delim) {
+    vector<string> elems;
+    stringstream ss(s);
+    string item;
+    while (getline(ss, item, delim)) elems.push_back(item);
+    return elems;
+}
+
+// ---- OBJ loader ----
+void TriangleMesh::createMesh(string path) {
+    ifstream f(path);
+    if (!f.is_open()) { cout << "Unable to open file: " << path << "\n"; return; }
+
+    string line;
+    while (getline(f, line)) {
+        auto arr = split(line, ' ');
+        if (arr.empty()) continue;
+        if (arr[0] == "v" && arr.size() >= 4) {
+            corners.push_back(Vect(stod(arr[1]), stod(arr[2]), stod(arr[3])));
+        } else if (arr[0] == "vt" && arr.size() >= 3) {
+            textures.push_back(Vect(stod(arr[1]), stod(arr[2]), 0));
+        } else if (arr[0] == "vn" && arr.size() >= 4) {
+            vnormals.push_back(Vect(stod(arr[1]), stod(arr[2]), stod(arr[3])));
+        } else if (arr[0] == "f" && arr.size() >= 4) {
+            auto pa = split(arr[1], '/');
+            auto pb = split(arr[2], '/');
+            auto pc = split(arr[3], '/');
+            int c1 = stoi(pa[0]) - 1;
+            int c2 = stoi(pb[0]) - 1;
+            int c3 = stoi(pc[0]) - 1;
+            int n1 = stoi(pa[2]) - 1;
+            int n2 = stoi(pb[2]) - 1;
+            int n3 = stoi(pc[2]) - 1;
+
+            if (setText && pa.size() > 1 && !pa[1].empty()) {
+                int t1 = stoi(pa[1]) - 1;
+                int t2 = stoi(pb[1]) - 1;
+                int t3 = stoi(pc[1]) - 1;
+                triangleOs.push_back(Triangle(
+                    &corners[c1], &corners[c2], &corners[c3],
+                    vnormals[n1], vnormals[n2], vnormals[n3],
+                    textures[t1], textures[t2], textures[t3], texture));
+            } else {
+                triangleOs.push_back(Triangle(
+                    &corners[c1], &corners[c2], &corners[c3],
+                    vnormals[n1], vnormals[n2], vnormals[n3], color));
+            }
+        }
+    }
+    f.close();
+
+    for (auto& t : triangleOs) triangles.push_back(&t);
+
+    // bounding radius in local space
+    boundingRadius = 0;
+    for (auto& v : corners) {
+        double m = v.magnitude();
+        if (m > boundingRadius) boundingRadius = m;
     }
 }
 
-
-std::vector<std::string> split(const std::string &s, char delim) {
-    std::vector<std::string> elems;
-    split(s, delim, elems);
-    return elems;
-}
-bool TriangleMesh::pointInTriangle(Triangle t, Vect p){
+// ---- point-in-triangle (local space) ----
+bool TriangleMesh::pointInTriangle(Triangle& t, Vect p) {
     Vect normal = t.getTriangleNormal();
-    Vect A = t.getA();
-    Vect B = t.getC();
-    Vect C = t.getB();
-    Vect Q = p;
-    Vect QA (Q.getX()- A.getX(),Q.getY()- A.getY(), Q.getZ()- A.getZ()); 
-    double test4 = QA.dotProduct(t.getTriangleNormal());
+    Vect A = t.getA(), B = t.getC(), C = t.getB();
 
+    Vect QA(p.getX()-A.getX(), p.getY()-A.getY(), p.getZ()-A.getZ());
+    double onPlane = QA.dotProduct(normal);
 
     Vect ba = B.add(A.negative()).negative();
     Vect ca = C.add(A.negative()).negative();
-
     Vect ap = A.add(p.negative()).negative();
     Vect bp = B.add(p.negative()).negative();
     Vect cp = C.add(p.negative()).negative();
 
+    double areaABC = fabs(normal.dotProduct(ba.crossProduct(ca)));
+    double areaPBC = fabs(normal.dotProduct(bp.crossProduct(cp)));
+    double areaPCA = fabs(normal.dotProduct(cp.crossProduct(ap)));
 
-    double areaABC = normal.dotProduct(ba.crossProduct(ca));
-    double areaPBC = normal.dotProduct(bp.crossProduct(cp));
-    double areaPCA = normal.dotProduct(cp.crossProduct(ap));
+    double u = areaPBC / areaABC;
+    double v = areaPCA / areaABC;
+    double w = 1.0 - u - v;
 
+    // normalise barycentric
+    double len = sqrt(u*u + v*v + w*w);
+    if (len > 1e-10) { u /= len; v /= len; w /= len; }
 
-    if(areaABC < 0){areaABC = -areaABC;}
-    if(areaPBC < 0){areaPBC = -areaPBC;}
-    if(areaPCA < 0){areaPCA = -areaPCA;}
-    
-
-   
-    //real areaABC = DOT( normal, CROSS( (b - a), (c - a) )  ) ;
-    //real areaPBC = DOT( normal, CROSS( (b - P), (c - P) )  ) ;
-    //real areaPCA = DOT( normal, CROSS( (c - P), (a - P) )  ) ;
-
-    double u = areaPBC / areaABC ; // alpha
-    double v = areaPCA / areaABC ; // beta
-    double w = 1.0f - u - v ; // gamma
-    Vect bary (u,v,w);
-    bary = bary.normalize();
-  
-    u = bary.getX();
-    v = bary.getY();
-    w = bary.getZ();
-    double a = .0000000000001;
-    if(u >= 0 -a  && u <= 1 + a && v >= 0 - a && v <= 1 + a && w >= 0 - a && w <= 1 + a && test4 > -a  && test4 < a){
-        return true;
-    }
-    else{
-        return false;
-    }
-    /*
-    Vect normal = t.getTriangleNormal();
-    Vect A = t.getA();
-    Vect B = t.getC();
-    Vect C = t.getB();
-
-    Vect n = normal;
-
-    Vect ba = B.add(A.negative()).negative();
-    Vect ca = C.add(A.negative()).negative();
-
-    Vect ap = A.add(point.negative()).negative();
-    Vect bp = B.add(point.negative()).negative();
-    Vect cp = C.add(point.negative()).negative();
-
-
-    double areaABC = n.dotProduct(ba.crossProduct(ca));
-    double areaPBC = n.dotProduct(bp.crossProduct(cp));
-    double areaPCA = n.dotProduct(cp.crossProduct(ap));
-
-
-    if(areaABC < 0){areaABC = -areaABC;}
-    if(areaPBC < 0){areaPBC = -areaPBC;}
-    if(areaPCA < 0){areaPCA = -areaPCA;}
-    
-
-   
-    //real areaABC = DOT( normal, CROSS( (b - a), (c - a) )  ) ;
-    //real areaPBC = DOT( normal, CROSS( (b - P), (c - P) )  ) ;
-    //real areaPCA = DOT( normal, CROSS( (c - P), (a - P) )  ) ;
-
-    double u = areaPBC / areaABC ; // alpha
-    double v = areaPCA / areaABC ; // beta
-    double w = 1.0f - u - v ; // gamma
-
-
-    if(u >= 0 && u <= 1 && v >= 0 && v <= 1 && w >= 0 && w <= 1){
-        return true;
-    }
-    else{
-        return false;
-    }
-    */
-    
-
-   
+    double eps = 1e-13;
+    return (u >= -eps && u <= 1+eps &&
+            v >= -eps && v <= 1+eps &&
+            w >= -eps && w <= 1+eps &&
+            onPlane > -eps && onPlane < eps);
 }
-void TriangleMesh::createMesh(string c){
-    cout << "creating mesh"  << endl;
-    string line;
-    ifstream myfile (c);
-    if (myfile.is_open())
-    {
-        while ( getline (myfile,line) )
-        {
-            vector<string> arr = split(line, ' ');
-            if(arr[0] == "v"){
-                Vect v (stod(arr[1]), stod(arr[2]), stod(arr[3]));
-                corners.push_back(v);
-            }
-            if(arr[0] == "vt"){
-                Vect v (stod(arr[1]), stod(arr[2]),0);
-                textures.push_back(v);
-            }
-            if(arr[0] == "vn"){
-                Vect v (stod(arr[1]), stod(arr[2]), stod(arr[3]));
-                normals.push_back(v);
-            }
-            if(arr[0] == "f"){
-                string a = split(arr[1], '/')[0];
-                string b = split(arr[2], '/')[0];
-                string c = split(arr[3], '/')[0];
-                string at = split(arr[1], '/')[1];
-                string bt = split(arr[2], '/')[1];
-                string ct = split(arr[3], '/')[1];
-                string an = split(arr[1], '/')[2];
-                string bn = split(arr[2], '/')[2];
-                string cn = split(arr[3], '/')[2];
-                int c1 = stoi(a) -1; 
-                int c2 = stoi(b) -1; 
-                int c3 = stoi(c) - 1; 
-               
-                int n1 = stoi(an) -1; 
-                int n2 = stoi(bn) -1; 
-                int n3 = stoi(cn) -1; 
-                Triangle t;
-                if(setText){
-                     int t1 = stoi(at) -1; 
-                    int t2 = stoi(bt) -1; 
-                    int t3 = stoi(ct) -1; 
-                     t = Triangle(&corners[c1], &corners[c2], &corners[c3], normals[n1], normals[n2], normals[n3], textures[t1],textures[t2],textures[t3], texture);
 
-                }
-                else{
-                     t = Triangle(&corners[c1], &corners[c2], &corners[c3], normals[n1], normals[n2], normals[n3], color);
-                }
-
-                triangleOs.push_back(t);
-
-            }
-
-        }
-        myfile.close();
-    }
-
-    else cout << "Unable to open file \n"; 
-
-    for(int i = 0; i< triangleOs.size(); i++){
-        triangles.push_back(&triangleOs[i]);
-    }
-    
-    double max = 0;
-    for(int i = 0; i < corners.size(); i++){
-        if(corners[i].magnitude() > max){
-            max = corners[i].magnitude();
-        }
-    }
-    boundingSphere = Sphere(Vect(), max , Color());
-
-
-
-
-
+// ---- transform helpers ----
+// Build (T * R)^-1 for ray transform
+static Matrix4x4 buildInv(Vect pos, Matrix4x4 rot) {
+    Matrix4x4 t;
+    t.translate(pos.getX(), pos.getY(), pos.getZ());
+    return t.mult(rot).inverse();
 }
-Color TriangleMesh::getColor(Vect p){
 
-    for (int index = 0; index < triangles.size(); index++) {
-        Triangle* op  =  triangles.at(index);
-        Triangle o = *op;
-        if(pointInTriangle(o, p)){
-            return o.getColor(p);
-        }
-
-    }
-    return Color(1,1,1,0);
-}
-Vect TriangleMesh::getNormalAt(Vect point){
-    //cout << "getting normal " << endl;
-    for (int index = 0; index < triangles.size(); index++) {
-        Triangle* op  =  triangles.at(index);
-        Triangle o = *op;
-        if(pointInTriangle(o, point)){
-            return o.getNormalAt(point);
-        }
-
-    }
-    cout << "Missed "<< endl;
-    return Vect(0,0,0);
-}
+// ---- findIntersection ----
 double TriangleMesh::findIntersection(Ray ray) {
-    if(boundingSphere.findIntersection(ray) == -1){return -1;}
+    Matrix4x4 inv = buildInv(position, rotation);
 
-    vector<double> intersections;      
-    
-    for (int index = 0; index < triangles.size(); index++) {
-        Triangle* op  =  triangles.at(index);
-        Triangle o = *op;
-        Vect a = o.getC();
+    // Transform ray into local space
+    Vect p0 = ray.getOrigin();
+    Vect p1 = p0.add(ray.getDirection());
+    Vect lp0 = inv.mult(p0);
+    Vect lp1 = inv.mult(p1);
+    Vect ldir = lp1.add(lp0.negative()).normalize();
+    Ray localRay(lp0, ldir);
 
-        intersections.push_back(o.findIntersection(ray));   
+    // Bounding sphere test in local space
+    Sphere bsphere(Vect(0,0,0), boundingRadius, Color());
+    if (bsphere.findIntersection(localRay) == -1) return -1;
+
+    double best = -1;
+    for (auto* tp : triangles) {
+        double t = tp->findIntersection(localRay);
+        if (t > 0.01 && (best < 0 || t < best))
+            best = t;
     }
-    int index_of_winning_object = Raytracer::closestObjectIndex(intersections);
-    if(index_of_winning_object >= 0){
-        return intersections.at(index_of_winning_object);
-
-    } 
-    return -1;
+    return best;
 }
-void TriangleMesh::rotate(Matrix r){
-    for (int index = 0; index < triangles.size(); index++) {
-        Vect A = triangles.at(index)->getA();
-        Vect B = triangleOs.at(index).getA();
 
-        triangles.at(index)->rotate(r);
-    
+// ---- getNormalAt ----
+Vect TriangleMesh::getNormalAt(Vect worldPoint) {
+    Matrix4x4 inv = buildInv(position, rotation);
+    Vect localPoint = inv.mult(worldPoint);
+
+    Matrix4x4 rotInv = rotation.inverse();
+    Matrix4x4 tinv = rotInv.transpose();
+
+    for (auto* tp : triangles) {
+        if (pointInTriangle(*tp, localPoint)) {
+            Vect localNorm = tp->getNormalAt(localPoint);
+            return tinv.mult(localNorm).normalize();
+        }
     }
+    return Vect(0, 1, 0);
 }
 
-void TriangleMesh::translate(Vect p){
-    for (int index = 0; index < triangles.size(); index++) {
-   
+// ---- getColor ----
+Color TriangleMesh::getColor(Vect worldPoint) {
+    Matrix4x4 inv = buildInv(position, rotation);
+    Vect localPoint = inv.mult(worldPoint);
 
-        triangles.at(index)->translate(p);
-    
+    for (auto* tp : triangles) {
+        if (pointInTriangle(*tp, localPoint))
+            return tp->getColor(localPoint);
     }
-    boundingSphere.translate(p);
-}
-void TriangleMesh::scale(double x, double y, double z){
-    for (int index = 0; index < triangles.size(); index++) {
-        
-
-        triangles.at(index)->scale(x,y,z);
-    
-    }
-    double max = x; 
-    if(y > max){max = y;}
-    if(z < max){max = z;}
-    boundingSphere.scale(max);
-
-}
-bool TriangleMesh::getCL(){
-    return clearLight;
-
+    return Color(1, 1, 1, 0);
 }
 
-TriangleMesh::TriangleMesh(){
-    center = Vect(0,0,0);
-    color = Color(1,1,1,0);
-    setText = false;
-    clearLight = false;
+bool TriangleMesh::getCL() { return clearLight; }
+
+// ---- constructors ----
+TriangleMesh::TriangleMesh() {
+    center = Vect(0,0,0); color = Color(1,1,1,0);
+    setText = false; clearLight = false; boundingRadius = 0;
+    rotation = Matrix4x4(); position = Vect();
     createMesh("sphere.obj");
 }
-
-
-TriangleMesh::TriangleMesh(string file, Color c){
-    center = Vect(0,0,0);
-    color = c;
-    setText = false;
-    clearLight = false;
+TriangleMesh::TriangleMesh(string file, Color c) {
+    center = Vect(0,0,0); color = c;
+    setText = false; clearLight = false; boundingRadius = 0;
+    rotation = Matrix4x4(); position = Vect();
     createMesh(file);
 }
-TriangleMesh::TriangleMesh(string file, Color c, bool l){
-    center = Vect(0,0,0);
-    color = c;
-    setText = false;
-    clearLight = l;
+TriangleMesh::TriangleMesh(string file, Color c, bool l) {
+    center = Vect(0,0,0); color = c;
+    setText = false; clearLight = l; boundingRadius = 0;
+    rotation = Matrix4x4(); position = Vect();
     createMesh(file);
 }
-TriangleMesh::TriangleMesh(string file, Magick::Image* c){
-    center = Vect(0,0,0);
-    texture = c;
-    setText = true;
-    clearLight = false;
+TriangleMesh::TriangleMesh(string file, Magick::Image* c) {
+    center = Vect(0,0,0); texture = c;
+    setText = true; clearLight = false; boundingRadius = 0;
+    rotation = Matrix4x4(); position = Vect();
     createMesh(file);
-
 }
-TriangleMesh::TriangleMesh(string file, Magick::Image* c, bool l){
-    center = Vect(0,0,0);
-    texture = c;
-    setText = true;
-    clearLight = l;
+TriangleMesh::TriangleMesh(string file, Magick::Image* c, bool l) {
+    center = Vect(0,0,0); texture = c;
+    setText = true; clearLight = l; boundingRadius = 0;
+    rotation = Matrix4x4(); position = Vect();
     createMesh(file);
-    
 }

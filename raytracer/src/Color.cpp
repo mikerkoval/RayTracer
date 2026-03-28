@@ -18,16 +18,16 @@ double Color::brightness(){
 }
 
 Color Color::scalar(double scalar){
-    return Color(red * scalar, green*scalar, blue*scalar, special);
+    return Color(red * scalar, green*scalar, blue*scalar, specularity, transparency, special);
 }
 Color Color::add(Color color){
-    return Color(red + color.getRed(), green + color.getGreen(), blue + color.getBlue(), special);
+    return Color(red + color.getRed(), green + color.getGreen(), blue + color.getBlue(), specularity, transparency, special);
 }
 Color Color::multiply(Color color){
-    return Color( red * color.getRed(), green * color.getGreen(), blue * color.getBlue(), special);
+    return Color(red * color.getRed(), green * color.getGreen(), blue * color.getBlue(), specularity, transparency, special);
 }
 Color Color::average(Color color){
-    return Color((red + color.getRed())/2,(green + color.getGreen())/2,(blue + color.getBlue())/2, special );
+    return Color((red + color.getRed())/2,(green + color.getGreen())/2,(blue + color.getBlue())/2, specularity, transparency, special);
 }
 Color Color::clip(){
     double allLight = red + green + blue;
@@ -43,7 +43,7 @@ Color Color::clip(){
     if(red < 0){ red = 0;}
     if(green < 0){ green = 0;}
     if(blue < 0){ blue = 0;}
-    return Color (red, green, blue, special);
+    return Color(red, green, blue, specularity, transparency, special);
 }
 
 Color::Color(){

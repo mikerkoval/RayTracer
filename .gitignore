@@ -19,6 +19,7 @@ raytracer/cmake_install.cmake
 
 # Animation output
 Animation
+output/
 pictures/
 *.gif
 *.bmp

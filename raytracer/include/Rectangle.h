@@ -19,6 +19,7 @@ class Rectangle: public Object{
     vector<Vect> corners;
     vector<Triangle*> triangles;
 
+    int last_hit_index;
     Vect c1;
     Vect c2;
     Vect c3;
@@ -50,6 +51,7 @@ class Rectangle: public Object{
     bool pointInTriangle(Triangle t, Vect p);
     void createRectangle();
     Color getColor();
+    virtual Color getColor(Vect p);
 
     virtual int move(Vect m);
     virtual Vect getNormalAt(Vect point);
@@ -57,6 +59,7 @@ class Rectangle: public Object{
     virtual void rotate(Matrix r);
     virtual void rotateY(double s);
     virtual void rotateX(double s);
+    virtual void translate(Vect v);
     
 
 };

@@ -39,6 +39,6 @@ void Object::scale(double x, double y, double z){
 }
 
 Object::Object(){
-   
+    clearLight = false;
 }
 

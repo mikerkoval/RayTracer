@@ -37,6 +37,19 @@ int Raytracer::closestObjectIndex(vector<double> intersections){
     }
 }
 
+static Color skyColor(Vect dir) {
+    // t=0 at horizon, t=1 at zenith
+    double t = dir.getY();  // -1 to 1
+    t = (t + 1.0) * 0.5;   // remap to 0-1
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+    // horizon: warm light blue, zenith: deep blue
+    double r = 0.55 * (1.0 - t) + 0.1 * t;
+    double g = 0.75 * (1.0 - t) + 0.3 * t;
+    double b = 0.95 * (1.0 - t) + 0.6 * t;
+    return Color(r, g, b, 0);
+}
+
 Color Raytracer::getColorAt(Vect intersection_position,Vect intersecting_direction, vector<Object*> scene_objects, int index_closest,vector<Source*> light_sources,double  accuracy,double ambientlight, int n){
   
  
@@ -47,21 +60,21 @@ Color Raytracer::getColorAt(Vect intersection_position,Vect intersecting_directi
     if (winning_object_color.getSpecial() == 2) {
         // checkered/tile floor pattern
         int square = (int)floor(intersection_position.getX()) + (int)floor(intersection_position.getZ());
-        bool cond = ((int)floor(intersection_position.getX() * 10)) %15 == 0 || ((int)floor(intersection_position.getZ() * 10)) %15 == 0 ;
+        bool cond = ((int)floor(intersection_position.getX() * 10)) %10 == 0 || ((int)floor(intersection_position.getZ() * 10)) %10 == 0 ;
         if (cond ) {
-            // black tile
-            winning_object_color.setRed(0);
-            winning_object_color.setGreen(0);
-            winning_object_color.setBlue(0);
-            winning_object_color.setSpecularity(0);
+            // dark grid line
+            winning_object_color.setRed(0.08);
+            winning_object_color.setGreen(0.08);
+            winning_object_color.setBlue(0.12);
+            winning_object_color.setSpecularity(0.3);
         }
-        
+
         else {
-            // white tile
-            winning_object_color.setRed(1);
-            winning_object_color.setGreen(1);
-            winning_object_color.setBlue(1);
-            winning_object_color.setSpecularity(.7);
+            // light tile — medium gray so reflections show through
+            winning_object_color.setRed(0.38);
+            winning_object_color.setGreen(0.38);
+            winning_object_color.setBlue(0.45);
+            winning_object_color.setSpecularity(0.5);
         }
     }
     if (winning_object_color.getSpecial() == 3) {
@@ -91,21 +104,25 @@ Color Raytracer::getColorAt(Vect intersection_position,Vect intersecting_directi
         Vect scalar2 = add1.mult(2);
         Vect add2 = intersecting_direction.negative().add(scalar2);
         Vect reflection_direction = add2.normalize();
-        
-        Ray reflection_ray (intersection_position, reflection_direction);
-        
+
+        // offset origin along normal to avoid self-intersection
+        Vect reflection_ray_origin = intersection_position.add(winning_object_normal.mult(0.01));
+        Ray reflection_ray (reflection_ray_origin, reflection_direction);
+
         // determine what the ray intersects with first
         vector<double> reflection_intersections;
-        
+
         for (int reflection_index = 0; reflection_index < scene_objects.size(); reflection_index++) {
             reflection_intersections.push_back(scene_objects.at(reflection_index)->findIntersection(reflection_ray));
         }
-        
+
         int index_of_winning_object_with_reflection = closestObjectIndex(reflection_intersections);
-        
-        if (index_of_winning_object_with_reflection != -1) {
+
+        if (index_of_winning_object_with_reflection == -1) {
+            final_color = final_color.add(skyColor(reflection_direction).scalar(winning_object_color.getSpecularity()));
+        } else if (index_of_winning_object_with_reflection != -1) {
             // reflection ray missed everything else
-            if (reflection_intersections.at(index_of_winning_object_with_reflection) > accuracy) {
+            if (reflection_intersections.at(index_of_winning_object_with_reflection) > 0.01) {
                 // determine the position and direction at the point of intersection with the reflection ray
                 // the ray only affects the color if it reflected off something
                 
@@ -193,7 +210,9 @@ Color Raytracer::getColorAt(Vect intersection_position,Vect intersecting_directi
 
         Vect reflection_direction = intersecting_direction.add(winning_object_normal.mult(c1)).mult(ind).add(winning_object_normal.mult(c2).negative());
         reflection_direction = reflection_direction.normalize();
-        Ray reflection_ray (intersection_position, reflection_direction);
+        // offset origin along refraction direction to avoid self-intersection
+        Vect refraction_ray_origin = intersection_position.add(reflection_direction.mult(0.001));
+        Ray reflection_ray (refraction_ray_origin, reflection_direction);
         
         // determine what the ray intersects with first
         vector<double> reflection_intersections;
@@ -206,7 +225,7 @@ Color Raytracer::getColorAt(Vect intersection_position,Vect intersecting_directi
         
         if (index_of_winning_object_with_reflection != -1) {
             // reflection ray missed everthing else
-            if (reflection_intersections.at(index_of_winning_object_with_reflection) > accuracy) {
+            if (reflection_intersections.at(index_of_winning_object_with_reflection) > 0.01) {
                 // determine the position and direction at the point of intersection with the reflection ray
                 // the ray only affects the color if it reflected off something
                 
@@ -269,31 +288,24 @@ Color Raytracer::getColorAt(Vect intersection_position,Vect intersecting_directi
     for (int light_index = 0; light_index < light_sources.size(); light_index++){
         Vect light_direction = light_sources.at(light_index) -> getPosition().add(intersection_position.negative()).normalize();
         float cosine_angle = winning_object_normal.dotProduct(light_direction);
-        
         if(cosine_angle >0 || scene_objects.at(index_closest) ->getCL()){
             //test for shadows 
             
             bool shadowed = false;
-            
+
             Vect distance_to_light = light_sources.at(light_index)->getPosition().add(intersection_position.negative());
-            float distance_to_light_magnitude = distance_to_light.magnitude();
-            
-            Ray shadow_ray (intersection_position, light_sources.at(light_index)->getPosition().add(intersection_position.negative()).normalize());
-            
-            vector<double> secondary_intersections;
-            
-            for (int object_index = 0; object_index < scene_objects.size() && shadowed == false; object_index++) {
-                secondary_intersections.push_back(scene_objects.at(object_index)->findIntersection(shadow_ray));
-            }
-         
-            for (int c = 0; c < secondary_intersections.size(); c++) {
-                if (secondary_intersections.at(c) > accuracy) {
-                    if (secondary_intersections.at(c) <= distance_to_light_magnitude && !scene_objects.at(c) ->getCL() ) {
-                        shadowed = true;
-                        break;
-                    } 
+            double distance_to_light_magnitude = distance_to_light.magnitude();
+
+            Vect shadow_origin = intersection_position.add(winning_object_normal.mult(0.05));
+            Ray shadow_ray (shadow_origin, light_sources.at(light_index)->getPosition().add(intersection_position.negative()).normalize());
+
+            for (int object_index = 0; object_index < scene_objects.size(); object_index++) {
+                if (scene_objects.at(object_index)->getCL()) continue;
+                double t = scene_objects.at(object_index)->findIntersection(shadow_ray);
+                if (t > 0.01 && t <= distance_to_light_magnitude) {
+                    shadowed = true;
+                    break;
                 }
-                
             }
 
             if (shadowed == false) {
@@ -304,26 +316,10 @@ Color Raytracer::getColorAt(Vect intersection_position,Vect intersecting_directi
                     final_color = final_color.add(winning_object_color.multiply(light_sources.at(light_index)->getColor()).scalar(cosine_angle));
                 }
 
-              
-                
-                if (winning_object_color.getSpecularity() > 0 && winning_object_color.getSpecularity() <= 1) {
-                    // special [0-1]
-                    double dot1 = winning_object_normal.dotProduct(intersecting_direction.negative());
-                    Vect scalar1 = winning_object_normal.mult(dot1);
-                    Vect add1 = scalar1.add(intersecting_direction);
-                    Vect scalar2 = add1.mult(2);
-                    Vect add2 = intersecting_direction.negative().add(scalar2);
-                    Vect reflection_direction = add2.normalize();
-                    
-                    double specular = reflection_direction.dotProduct(light_direction);
-                    if (specular > 0) {
-                        //cout << "specular" << endl;
-                        specular = pow(specular, 10);
-                        //cout<< specular << endl;
-                        final_color = final_color.add(light_sources.at(light_index)->getColor().scalar(specular*winning_object_color.getSpecularity()));
-                    }
-                }
-                
+
+
+                // Specular highlight handled by reflection ray above, not Phong term
+
             }
         }   
     }
@@ -448,10 +444,10 @@ void *call_from_thread(void *args) {
                             //cout << "Direction: (" << cam_ray.getRayDirection().getVectX() << ", " << cam_ray.getRayDirection().getVectY() << ", " << cam_ray.getRayDirection().getVectZ() << ") \n";
                         }
                         if (index_of_winning_object == -1) {
-                            // set the backgroung black
-                            tempRed[aa_index] = 0;
-                            tempGreen[aa_index] = 0;
-                            tempBlue[aa_index] = 0;
+                            Color sky = skyColor(cam_ray_direction);
+                            tempRed[aa_index]   = sky.getRed();
+                            tempGreen[aa_index] = sky.getGreen();
+                            tempBlue[aa_index]  = sky.getBlue();
                         }
                         else{
                             // index coresponds to an object in our scene
@@ -517,7 +513,8 @@ int Raytracer::generate (vector<Object*> objs, vector<Source*>lights, std::strin
 
     cout << "GENERATING \n";
     aadepth = aa;
-    RGBType *pixels = new RGBType[n];
+    RGBType *pixels = new RGBType[n]();
+
     
     vector<Source*> light_sources;
     vector <Object*> scene_objects;
@@ -626,10 +623,10 @@ int Raytracer::generate (vector<Object*> objs, vector<Source*>lights, std::strin
                             //cout << "Direction: (" << cam_ray.getRayDirection().getVectX() << ", " << cam_ray.getRayDirection().getVectY() << ", " << cam_ray.getRayDirection().getVectZ() << ") \n";
                         }
                         if (index_of_winning_object == -1) {
-                            // set the backgroung black
-                            tempRed[aa_index] = 0;
-                            tempGreen[aa_index] = 0;
-                            tempBlue[aa_index] = 0;
+                            Color sky = skyColor(cam_ray_direction);
+                            tempRed[aa_index]   = sky.getRed();
+                            tempGreen[aa_index] = sky.getGreen();
+                            tempBlue[aa_index]  = sky.getBlue();
                         }
                         else{
                             // index coresponds to an object in our scene
@@ -689,69 +686,23 @@ int Raytracer::generate (vector<Object*> objs, vector<Source*>lights, std::strin
 }
 void Raytracer::savebmp (const char *filename, int w, int h, int dpi, RGBType *data, int size){
     cout << "SAVING \n";
-    RGBType *pixels = new RGBType[size];
-    FILE *f;
-    int k = w*h;
-    int s = 4*k;
-    int filesize = 54 + s;
-
-    double factor = 39.375;
-    int m = static_cast<int>(factor);
-
-    int ppm = dpi*m;
-
-    unsigned char bmpfileheader[14] = {'B', 'M', 0,0,0,0, 0,0,0,0, 54, 0,0,0};
-    unsigned char bmpinfoheader[40] = {40,0,0,0, 0,0,0,0, 0,0,0,0, 1,0,24,0};
-
-    bmpfileheader[2] = (unsigned char) (filesize);
-    bmpfileheader[3] = (unsigned char) (filesize >> 8);
-    bmpfileheader[4] = (unsigned char) (filesize >> 16);
-    bmpfileheader[5] = (unsigned char) (filesize >> 24);
-
-    bmpinfoheader[4] = (unsigned char) (w);
-    bmpinfoheader[5] = (unsigned char) (w>>8);
-    bmpinfoheader[6] = (unsigned char) (w>>16);
-    bmpinfoheader[7] = (unsigned char) (w>>24);
-
-    bmpinfoheader[8] = (unsigned char) (h);
-    bmpinfoheader[9] = (unsigned char) (h>>8);
-    bmpinfoheader[10] = (unsigned char) (h>>16);
-    bmpinfoheader[11] = (unsigned char) (h>>24);
-
-    bmpinfoheader[21] = (unsigned char) (s);
-    bmpinfoheader[22] = (unsigned char) (s>>8);
-    bmpinfoheader[23] = (unsigned char) (s>>16);
-    bmpinfoheader[24] = (unsigned char) (s>>24);
-
-    bmpinfoheader[25] = (unsigned char) (ppm);
-    bmpinfoheader[26] = (unsigned char) (ppm>>8);
-    bmpinfoheader[27] = (unsigned char) (ppm>>16);
-    bmpinfoheader[28] = (unsigned char) (ppm>>24);
-
-    bmpinfoheader[29] = (unsigned char) (ppm);
-    bmpinfoheader[30] = (unsigned char) (ppm>>8);
-    bmpinfoheader[31] = (unsigned char) (ppm>>16);
-    bmpinfoheader[32] = (unsigned char) (ppm>>24);
-
-    f = fopen(filename, "wb");
-
-    fwrite(bmpfileheader, 1, 14, f);
-    fwrite(bmpinfoheader, 1, 40, f); 
-
-    for (int i = 0; i < k; i ++){
-        RGBType rgb = data[i];
-
-        double red = (data[i].r) * 255;
-        double green = (data[i].g) * 255;
-        double blue = (data[i].b) * 255;
-
-        unsigned char color[3] = {(int) floor(blue), (int) floor(green), (int) floor(red)};
-
-        fwrite(color, 1, 3, f);
+    // Build raw 8-bit RGB buffer, flipping rows (renderer stores bottom-to-top)
+    vector<unsigned char> buf(w * h * 3);
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            int src = (h - 1 - y) * w + x;
+            int dst = y * w + x;
+            double r = data[src].r < 0 ? 0 : (data[src].r > 1 ? 1 : data[src].r);
+            double g = data[src].g < 0 ? 0 : (data[src].g > 1 ? 1 : data[src].g);
+            double b = data[src].b < 0 ? 0 : (data[src].b > 1 ? 1 : data[src].b);
+            buf[dst*3 + 0] = (unsigned char)(r * 255);
+            buf[dst*3 + 1] = (unsigned char)(g * 255);
+            buf[dst*3 + 2] = (unsigned char)(b * 255);
+        }
     }
-
-    fclose(f);
-
+    Magick::Image image;
+    image.read(w, h, "RGB", Magick::CharPixel, buf.data());
+    image.write(filename);
 }
 
 
@@ -771,7 +722,7 @@ Raytracer::Raytracer(){
     aadepth = 2;
     aathreshold = 0.1;
     aspectratio = (double)width/ (double)height;
-    ambientlight = 0.2;
+    ambientlight = 0.35;
     accuracy = 0.00000000000000001;
     O = Vect(0,0,0);
     X = Vect(1,0,0);

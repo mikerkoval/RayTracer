@@ -3,6 +3,7 @@
 using namespace std;
 double Cylinder::getRadius(){return radius;}
 Color Cylinder::getColor(){return color;}
+Color Cylinder::getColor(Vect p){return color;}
 
 
 Vect Cylinder::getNormalAt(Vect point){
@@ -26,7 +27,11 @@ Vect Cylinder::getNormalAt(Vect point){
     }
 
     else {
-        Vect norm = tinv2.mult(Vect(point.getX(),point.getY(),0).normalize());
+        // Normalize XY to project back onto cylinder surface before computing normal
+        double len = sqrt(point.getX()*point.getX() + point.getY()*point.getY());
+        double nx = (len > 1e-8) ? point.getX()/len : 0;
+        double ny = (len > 1e-8) ? point.getY()/len : 0;
+        Vect norm = tinv2.mult(Vect(nx, ny, 0));
         return norm.normalize();
     }
 }
@@ -58,7 +63,7 @@ double Cylinder::findIntersection(Ray ray) {
 
     double a = pow(rdx, 2) + pow(rdy, 2);
     double b = 2 * rox * rdx + 2* roy * rdy;
-    double c = pow(rox, 2) + pow(roy, 2) - radius;
+    double c = pow(rox, 2) + pow(roy, 2) - radius*radius;
     
 
     double discriminant = b*b - 4*a*c;
@@ -112,13 +117,7 @@ double Cylinder::findIntersection(Ray ray) {
     }
     ///
     if(time >=.001){
-        
-        Vect point = new_ray_origin.add(new_ray_direction.mult(time));
-        //cout << time << endl;
-        point = transform.mult(point);
-        //cout << (point.getx() - ray_origin.getX())/ ray_direction.getX() << endl;
-
-        return (point.getX() - ray_origin.getX())/ ray_direction.getX();
+        return time;
     }
    
     

@@ -45,16 +45,7 @@ Color Sphere::getColor(Vect p){
        
 
     }
-    p = inverse.mult(p);
-    double u = acos(p.getY() / p.magnitude());
-    double v = atan2(p.getZ(), p.getX());
-    double r = sin(u);
-    double g = sin(v);
-    double b = sin(u + v);
-    if (r < 0){r = -r;}
-    if (g < 0){g = -g;}
-    if (b < 0){b = -b;}
-    return Color(r, g, b, 0);
+    return color;
 }
 int Sphere::move(Vect m){
     center = m;

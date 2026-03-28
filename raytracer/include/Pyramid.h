@@ -19,6 +19,7 @@ class Pyramid: public Object{
     vector<Vect> corners;
     vector<Triangle*> triangles;
     vector<Triangle> triangleOs;
+    int last_hit_index;
 
     public:
 
@@ -31,10 +32,12 @@ class Pyramid: public Object{
     
     void createPyramid();
     Color getColor();
+    virtual Color getColor(Vect p);
 
     virtual Vect getNormalAt(Vect point);
     virtual double findIntersection(Ray ray) ;
     virtual void rotate(Matrix r);
+    virtual void translate(Vect v);
     
 
 };

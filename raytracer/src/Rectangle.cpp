@@ -26,7 +26,7 @@ bool Rectangle::pointInTriangle(Triangle t, Vect p){
     if(a3 < 0){ a3 = -1;}
 
     double test4 = QA.dotProduct(t.getNormalAt(p));
-    if(a1 + a2 + a3 < 3.1415926 * 2 + .0001 &&  a1 + a2 + a3 < 3.1415926 * 2 - .0001 && test4 < .00001 && test4 > -.00001){
+    if(a1 + a2 + a3 < 3.1415926 * 2 + .0001 &&  a1 + a2 + a3 > 3.1415926 * 2 - .0001 && test4 < .00001 && test4 > -.00001){
         return true;
     }
     else{
@@ -100,6 +100,7 @@ void Rectangle::createRectangle(){
     
 }
 Color Rectangle::getColor(){return color;}
+Color Rectangle::getColor(Vect p){return color;}
 
 int Rectangle::move(Vect m){
     center = m;
@@ -107,30 +108,38 @@ int Rectangle::move(Vect m){
 
 }
 Vect Rectangle::getNormalAt(Vect point){
-    for (int index = 0; index < triangles.size(); index++) {
-        Triangle* op  =  triangles.at(index);
-        Triangle o = *op;
-        if(pointInTriangle(o, point)){
-            return o.getNormalAt(point);
+    // Find which face the point lies on by checking which triangle's plane
+    // contains it. Thread-safe: no shared mutable state, works after rotation.
+    Vect toPoint(point.getX() - center.getX(),
+                 point.getY() - center.getY(),
+                 point.getZ() - center.getZ());
+    // Check pairs of opposite faces (2 triangles per face, 6 faces = 12 triangles)
+    // triangles 0-1: front, 2-3: back, 4-5: left, 6-7: right, 8-9: top, 10-11: bottom
+    for (int i = 0; i < (int)triangles.size(); i++) {
+        Vect n = triangles.at(i)->getTriangleNormal();
+        Vect toA(triangles.at(i)->getA().getX() - point.getX(),
+                 triangles.at(i)->getA().getY() - point.getY(),
+                 triangles.at(i)->getA().getZ() - point.getZ());
+        if (fabs(n.dotProduct(toA)) < 0.01) {
+            if (n.dotProduct(toPoint) < 0) n = n.negative();
+            return n;
         }
     }
-    return Vect(0,0,0);
+    // Fallback: outward normal from closest face
+    Vect n = triangles.at(0)->getTriangleNormal();
+    if (n.dotProduct(toPoint) < 0) n = n.negative();
+    return n;
 }
 double Rectangle::findIntersection(Ray ray) {
-    vector<double> intersections;      
-    
+    vector<double> intersections;
     for (int index = 0; index < triangles.size(); index++) {
-        Triangle* op  =  triangles.at(index);
-        Triangle o = *op;
-        intersections.push_back(o.findIntersection(ray));   
+        intersections.push_back(triangles.at(index)->findIntersection(ray));
     }
-
     int index_of_winning_object = Raytracer::closestObjectIndex(intersections);
-
-    if(index_of_winning_object >= 0){
-        //cout << index_of_winning_object << endl;
+    if (index_of_winning_object >= 0) {
+        last_hit_index = index_of_winning_object;
         return intersections.at(index_of_winning_object);
-    } 
+    }
     return -1;
 }
 void Rectangle::rotate(Matrix r){
@@ -149,6 +158,12 @@ void Rectangle::rotateX(double s){
     Matrix m (r, s);
     rotate(m);
 }
+void Rectangle::translate(Vect v){
+    center = center.add(v);
+    for (int index = 0; index < triangles.size(); index++) {
+        triangles.at(index)->translate(v);
+    }
+}
 
 
 Rectangle::Rectangle(){
@@ -157,6 +172,7 @@ Rectangle::Rectangle(){
     length = 1;
     width = 1;
     height = 1;
+    last_hit_index = 0;
     createRectangle();
 }
 
@@ -166,5 +182,6 @@ Rectangle::Rectangle(Vect position, double l , double w, double h, Color col){
     width = w;
     height = h;
     color = col;
+    last_hit_index = 0;
     createRectangle();
 }
