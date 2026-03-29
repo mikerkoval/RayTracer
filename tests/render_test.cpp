@@ -103,6 +103,40 @@ static void scene_sphere_two_reflective(const string& outpath) {
     tracer.generate(objects, lights, outpath, 1, campos, lookat, true);
 }
 
+// Glass sphere showcasing Fresnel reflection/refraction
+static void scene_glass_sphere(const string& outpath) {
+    vector<Source*> lights;
+    Light light(Vect(-6, 10, -4), Color(0.9, 0.9, 0.9, 0));
+    lights.push_back(&light);
+
+    vector<Object*> objects;
+
+    // Glass sphere
+    Sphere glass(Vect(0, 0, 0), 1.5, Color(0.95, 0.95, 0.95, 1.0, 1.0, 0));
+
+    // Large red back wall as a plane to guarantee refracted rays hit something red
+    Plane back_wall(Vect(0, 0, -1), -8, Color(0.8, 0.15, 0.15, 0.0));
+    Sphere back(Vect(0, 0, 4), 1.0, Color(0.8, 0.15, 0.15, 0.0));
+
+    // Colored walls to make reflection clearly visible on the edges
+    Plane floor(Vect(0, 1, 0), -1.5, Color(0.85, 0.85, 0.85, 0.0));
+    Plane left_wall(Vect(1, 0, 0), -5, Color(0.7, 0.15, 0.15, 0.0));
+    Plane right_wall(Vect(-1, 0, 0), -5, Color(0.15, 0.6, 0.2, 0.0));
+
+    objects.push_back(&glass);
+    objects.push_back(&back_wall);
+    objects.push_back(&back);
+    objects.push_back(&floor);
+    objects.push_back(&left_wall);
+    objects.push_back(&right_wall);
+
+    Vect campos(0, 0.5, -5);
+    Vect lookat(0, 0, 0);
+
+    Raytracer tracer;
+    tracer.generate(objects, lights, outpath, 1, campos, lookat, true);
+}
+
 static void scene_mesh(const string& outpath) {
     vector<Source*> lights;
     Light light(Vect(-6, 10, -4), Color(0.7, 0.7, 0.7, 0));
@@ -136,6 +170,7 @@ int main(int argc, char* argv[]) {
     else if (scene == "sphere_floor")      scene_sphere_floor(outpath);
     else if (scene == "sphere_two")        scene_sphere_two(outpath);
     else if (scene == "sphere_two_reflective") scene_sphere_two_reflective(outpath);
+    else if (scene == "glass_sphere")          scene_glass_sphere(outpath);
     else if (scene == "mesh")              scene_mesh(outpath);
     else {
         cerr << "Unknown scene: " << scene << "\n";
