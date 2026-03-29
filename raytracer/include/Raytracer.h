@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <chrono>
 
 #include "Vect.h"
 #include "Ray.h"
@@ -26,7 +27,7 @@
 #include <thread>
 #include "Magick++.h"
 using namespace std;
-  
+
 struct RGBType {
     double r;
     double g;
@@ -34,8 +35,8 @@ struct RGBType {
 };
 class Raytracer {
 
-    clock_t t1, t2;
-  
+    std::chrono::steady_clock::time_point t1;
+
 
     int dpi;
     int width;
@@ -56,7 +57,7 @@ class Raytracer {
     Vect campos ;
     Vect look_at ;
     Vect diff_btw ;
-    
+
     Vect camdir;
     Vect camright;
     Vect camdown ;
@@ -65,7 +66,7 @@ class Raytracer {
 
 
 
-    ////////constructors 
+    ////////constructors
     public:
     Raytracer();
     // methods
@@ -73,10 +74,10 @@ class Raytracer {
 
     static Color getColorAt(Vect intersection_position,Vect intersecting_direction, vector<Object*> scene_objects, int index_closest,vector<Source*> light_sources,double  accuracy,double ambientlight, int n);
 
-    
+
     int generate (vector<Object*> objs, vector<Source*>lights, std::string filename, int aa, Vect, Vect, bool);
 
-    void savebmp (const char *filename, int w, int h, int dpi, RGBType *data, int size);
+    void savepng (const char *filename, int w, int h, int dpi, RGBType *data, int size);
 
 
 };

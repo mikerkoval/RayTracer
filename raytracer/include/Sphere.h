@@ -5,7 +5,6 @@
 #include "Vect.h"
 #include "Color.h"
 #include "Matrix.h"
-#include "bmp.h"
 #include "Magick++.h"
 class Sphere: public Object{
 

@@ -113,7 +113,11 @@ Color Raytracer::getColorAt(Vect intersection_position,Vect intersecting_directi
         vector<double> reflection_intersections;
 
         for (int reflection_index = 0; reflection_index < scene_objects.size(); reflection_index++) {
-            reflection_intersections.push_back(scene_objects.at(reflection_index)->findIntersection(reflection_ray));
+            if (reflection_index == index_closest && scene_objects.at(reflection_index)->isPlane()) {
+                reflection_intersections.push_back(-1);
+            } else {
+                reflection_intersections.push_back(scene_objects.at(reflection_index)->findIntersection(reflection_ray));
+            }
         }
 
         int index_of_winning_object_with_reflection = closestObjectIndex(reflection_intersections);
@@ -325,174 +329,108 @@ Color Raytracer::getColorAt(Vect intersection_position,Vect intersecting_directi
     }
     return final_color.clip();
 }
-typedef struct {
-    int thread_id;
-    int x;
-    vector<Source*> light_sources;
-    vector <Object*> scene_objects;
-    RGBType * pixels;
-    Vect camdir;
-    Vect camright;
-    Vect camdown;
-    Camera scene_cam;
-    int aadepth;
-    int height;
-    int width;
-    double accuracy;
-    double ambientlight;
-    double aspectratio;
-} thread_data;
 
-//This function will be called from a thread
+static void renderPixelRange(int xstart, int xend, int height, int width, int aadepth,
+    float aspectratio, double accuracy, double ambientlight,
+    Vect camdir, Vect camright, Vect camdown, Camera scene_cam,
+    vector<Object*>& scene_objects, vector<Source*>& light_sources,
+    RGBType* pixels)
+{
+    double xamnt, yamnt;
 
-void *call_from_thread(void *args) {
-        thread_data *my_data = (thread_data *) args;
+    for (int x = xstart; x < xend; x++) {
+        for (int y = 0; y < height; y++) {
+            int thisone = y*width + x;
 
-        int height = my_data -> height;
-        int width = my_data -> width;
-        int part = my_data -> x;
-        int aadepth = my_data -> aadepth;
+            int aa_samples = aadepth * aadepth;
+            vector<double> tempRed(aa_samples);
+            vector<double> tempGreen(aa_samples);
+            vector<double> tempBlue(aa_samples);
 
-        Vect camright = my_data -> camright;
-        Vect camdir = my_data -> camdir;
-        Vect camdown = my_data -> camdown;
-        Camera scene_cam = my_data -> scene_cam;
+            for (int aax = 0; aax < aadepth; aax++) {
+                for (int aay = 0; aay < aadepth; aay++) {
 
-        float aspectratio = my_data -> aspectratio;
+                    int aa_index = aay*aadepth + aax;
 
-    
-        vector<Source*> light_sources = my_data -> light_sources;
-        vector <Object*> scene_objects = my_data -> scene_objects;
-        double accuracy = my_data -> accuracy;
-        double ambientlight = my_data -> ambientlight;
-
-        RGBType * pixels = my_data -> pixels;
-   
-      // cout << x << " of " << width << endl;
-        double xamnt, yamnt;
-        int thisone, aa_index;
-
-        for (int x = (int)((width * part) / 7.0); x < (int)((width * (part + 1))/ 7.0); x++) {    
-            for (int y = 0; y < height; y++) {
-                thisone = y*width + x;
-                
-                // start with a blank pixel
-                double tempRed[aadepth*aadepth];
-                double tempGreen[aadepth*aadepth];
-                double tempBlue[aadepth*aadepth];
-                
-                for (int aax = 0; aax < aadepth; aax++) {
-                    for (int aay = 0; aay < aadepth; aay++) {
-                
-                        aa_index = aay*aadepth + aax;
-                        
-                        srand(time(0));
-                        
-                        // create the ray from the camera to this pixel
-                        if (aadepth == 1) {
-                        
-                            // start with no anti-aliasing
-                            if (width > height) {
-                                // the image is wider than it is tall
-                                xamnt = ((x+0.5)/width)*aspectratio - (((width-height)/(double)height)/2);
-                                yamnt = ((height - y) + 0.5)/height;
-                            }
-                            else if (height > width) {
-                                // the imager is taller than it is wide
-                                xamnt = (x + 0.5)/ width;
-                                yamnt = (((height - y) + 0.5)/height)/aspectratio - (((height - width)/(double)width)/2);
-                            }
-                            else {
-                                // the image is square
-                                xamnt = (x + 0.5)/width;
-                                yamnt = ((height - y) + 0.5)/height;
-                            }
+                    // create the ray from the camera to this pixel
+                    if (aadepth == 1) {
+                        if (width > height) {
+                            xamnt = ((x+0.5)/width)*aspectratio - (((width-height)/(double)height)/2);
+                            yamnt = ((height - y) + 0.5)/height;
+                        }
+                        else if (height > width) {
+                            xamnt = (x + 0.5)/ width;
+                            yamnt = (((height - y) + 0.5)/height)/aspectratio - (((height - width)/(double)width)/2);
                         }
                         else {
-                            // anti-aliasing
-                            if (width > height) {
-                                // the image is wider than it is tall
-                                xamnt = ((x + (double)aax/((double)aadepth - 1))/width)*aspectratio - (((width-height)/(double)height)/2);
-                                yamnt = ((height - y) + (double)aax/((double)aadepth - 1))/height;
-                            }
-                            else if (height > width) {
-                                // the imager is taller than it is wide
-                                xamnt = (x + (double)aax/((double)aadepth - 1))/ width;
-                                yamnt = (((height - y) + (double)aax/((double)aadepth - 1))/height)/aspectratio - (((height - width)/(double)width)/2);
-                            }
-                            else {
-                                // the image is square
-                                xamnt = (x + (double)aax/((double)aadepth - 1))/width;
-                                yamnt = ((height - y) + (double)aax/((double)aadepth - 1))/height;
-                            }
+                            xamnt = (x + 0.5)/width;
+                            yamnt = ((height - y) + 0.5)/height;
                         }
-                        
-                        Vect cam_ray_origin = scene_cam.getPosition();
-                        Vect cam_ray_direction = camdir.add(camright.mult(xamnt - 0.5).add(camdown.mult(yamnt - 0.5))).normalize();
-                        
-                        Ray cam_ray (cam_ray_origin, cam_ray_direction);
-                        
-                        vector<double> intersections;
-                        
-                        for (int index = 0; index < scene_objects.size(); index++) {
-                            intersections.push_back(scene_objects.at(index)->findIntersection(cam_ray));
+                    }
+                    else {
+                        // anti-aliasing
+                        if (width > height) {
+                            xamnt = ((x + (double)aax/((double)aadepth - 1))/width)*aspectratio - (((width-height)/(double)height)/2);
+                            yamnt = ((height - y) + (double)aax/((double)aadepth - 1))/height;
                         }
-                        
-                        int index_of_winning_object = Raytracer::closestObjectIndex(intersections);
-                        if (index_of_winning_object == 2){
-                            //cout << "Origin: (" << cam_ray.getRayOrigin().getVectX() << ", " << cam_ray.getRayOrigin().getVectY() << ", " << cam_ray.getRayOrigin().getVectZ() << ") ";
-                            //cout << "Direction: (" << cam_ray.getRayDirection().getVectX() << ", " << cam_ray.getRayDirection().getVectY() << ", " << cam_ray.getRayDirection().getVectZ() << ") \n";
+                        else if (height > width) {
+                            xamnt = (x + (double)aax/((double)aadepth - 1))/ width;
+                            yamnt = (((height - y) + (double)aax/((double)aadepth - 1))/height)/aspectratio - (((height - width)/(double)width)/2);
                         }
-                        if (index_of_winning_object == -1) {
-                            Color sky = skyColor(cam_ray_direction);
-                            tempRed[aa_index]   = sky.getRed();
-                            tempGreen[aa_index] = sky.getGreen();
-                            tempBlue[aa_index]  = sky.getBlue();
+                        else {
+                            xamnt = (x + (double)aax/((double)aadepth - 1))/width;
+                            yamnt = ((height - y) + (double)aax/((double)aadepth - 1))/height;
                         }
-                        else{
-                            // index coresponds to an object in our scene
-                            if (intersections.at(index_of_winning_object) > accuracy) {
-                                // determine the position and direction vectors at the point of intersection
-                                
-                                Vect intersection_position = cam_ray_origin.add(cam_ray_direction.mult(intersections.at(index_of_winning_object)));
-                                Vect intersecting_ray_direction = cam_ray_direction;
-                                
-                                Color intersection_color = Raytracer::getColorAt(intersection_position, intersecting_ray_direction, scene_objects, index_of_winning_object, light_sources, accuracy, ambientlight, 5);
-                                
-                                tempRed[aa_index] = intersection_color.getRed();
-                                tempGreen[aa_index] = intersection_color.getGreen();
-                                tempBlue[aa_index] = intersection_color.getBlue();
-                            }
+                    }
+
+                    Vect cam_ray_origin = scene_cam.getPosition();
+                    Vect cam_ray_direction = camdir.add(camright.mult(xamnt - 0.5).add(camdown.mult(yamnt - 0.5))).normalize();
+
+                    Ray cam_ray (cam_ray_origin, cam_ray_direction);
+
+                    vector<double> intersections;
+                    for (int index = 0; index < (int)scene_objects.size(); index++) {
+                        intersections.push_back(scene_objects.at(index)->findIntersection(cam_ray));
+                    }
+
+                    int index_of_winning_object = Raytracer::closestObjectIndex(intersections);
+
+                    if (index_of_winning_object == -1) {
+                        Color sky = skyColor(cam_ray_direction);
+                        tempRed[aa_index]   = sky.getRed();
+                        tempGreen[aa_index] = sky.getGreen();
+                        tempBlue[aa_index]  = sky.getBlue();
+                    }
+                    else {
+                        if (intersections.at(index_of_winning_object) > accuracy) {
+                            Vect intersection_position = cam_ray_origin.add(cam_ray_direction.mult(intersections.at(index_of_winning_object)));
+                            Vect intersecting_ray_direction = cam_ray_direction;
+
+                            Color intersection_color = Raytracer::getColorAt(intersection_position, intersecting_ray_direction, scene_objects, index_of_winning_object, light_sources, accuracy, ambientlight, 5);
+
+                            tempRed[aa_index]   = intersection_color.getRed();
+                            tempGreen[aa_index] = intersection_color.getGreen();
+                            tempBlue[aa_index]  = intersection_color.getBlue();
                         }
                     }
                 }
-                
-                // average the pixel color
-                double totalRed = 0;
-                double totalGreen = 0;
-                double totalBlue = 0;
-                
-                for (int iRed = 0; iRed < aadepth*aadepth; iRed++) {
-                    totalRed = totalRed + tempRed[iRed];
-                }
-                for (int iGreen = 0; iGreen < aadepth*aadepth; iGreen++) {
-                    totalGreen = totalGreen + tempGreen[iGreen];
-                }
-                for (int iBlue = 0; iBlue < aadepth*aadepth; iBlue++) {
-                    totalBlue = totalBlue + tempBlue[iBlue];
-                }
-                
-                double avgRed = totalRed/(aadepth*aadepth);
-                double avgGreen = totalGreen/(aadepth*aadepth);
-                double avgBlue = totalBlue/(aadepth*aadepth);
-                
-                pixels[thisone].r = avgRed;
-                pixels[thisone].g = avgGreen;
-                pixels[thisone].b = avgBlue;
             }
+
+            // average the pixel color
+            double totalRed = 0, totalGreen = 0, totalBlue = 0;
+            for (int i = 0; i < aa_samples; i++) {
+                totalRed   += tempRed[i];
+                totalGreen += tempGreen[i];
+                totalBlue  += tempBlue[i];
+            }
+
+            pixels[thisone].r = totalRed   / aa_samples;
+            pixels[thisone].g = totalGreen / aa_samples;
+            pixels[thisone].b = totalBlue  / aa_samples;
         }
-    return NULL;
+    }
 }
+
 
     
 int Raytracer::generate (vector<Object*> objs, vector<Source*>lights, std::string filename, int aa, Vect cp, Vect cd, bool fast){
@@ -523,168 +461,35 @@ int Raytracer::generate (vector<Object*> objs, vector<Source*>lights, std::strin
    
 
 
-     static const int num_threads = 7;
-     pthread_t t[7];
-    thread_data td[7];
-    cout << width/7 << endl;
-    if(fast){
-        for (int x = 0; x < 7; x++) {
-            td[x].thread_id = x;
-            td[x].x = x;
-            td[x].light_sources = light_sources;
-            td[x].scene_objects = scene_objects;
-            td[x].pixels = pixels;
-            td[x].camdir = camdir;
-            td[x].camright = camright;
-            td[x].camdown = camdown;
-            td[x].scene_cam = scene_cam;
-            td[x].aadepth = aa;
-            td[x].height = height;
-            td[x].width = width;
-            td[x].accuracy = accuracy;
-            td[x].ambientlight = ambientlight;
-            td[x].aspectratio = aspectratio;
-            pthread_create(&t[x], NULL, call_from_thread, (void *) &td[x]);
-        }
+    int num_threads = fast ? (int)std::thread::hardware_concurrency() : 1;
+    if (num_threads < 1) num_threads = 1;
+    cout << "Threads: " << num_threads << endl;
+
+    vector<std::thread> threads;
+    for (int i = 0; i < num_threads; i++) {
+        int xstart = (width * i)       / num_threads;
+        int xend   = (width * (i + 1)) / num_threads;
+        threads.emplace_back(renderPixelRange,
+            xstart, xend,
+            height, width, aadepth,
+            aspectratio, accuracy, ambientlight,
+            camdir, camright, camdown, scene_cam,
+            ref(scene_objects), ref(light_sources),
+            pixels);
     }
-    else{
-        double xamnt, yamnt;
-        int thisone, aa_index;
-        for (int x = 0; x < width; x++) {
-           // cout << x << " of " << width << endl;
-            for (int y = 0; y < height; y++) {
-                thisone = y*width + x;
-                
-                // start with a blank pixel
-                double tempRed[aadepth*aadepth];
-                double tempGreen[aadepth*aadepth];
-                double tempBlue[aadepth*aadepth];
-                
-                for (int aax = 0; aax < aadepth; aax++) {
-                    for (int aay = 0; aay < aadepth; aay++) {
-                
-                        aa_index = aay*aadepth + aax;
-                        
-                        srand(time(0));
-                        
-                        // create the ray from the camera to this pixel
-                        if (aadepth == 1) {
-                        
-                            // start with no anti-aliasing
-                            if (width > height) {
-                                // the image is wider than it is tall
-                                xamnt = ((x+0.5)/width)*aspectratio - (((width-height)/(double)height)/2);
-                                yamnt = ((height - y) + 0.5)/height;
-                            }
-                            else if (height > width) {
-                                // the imager is taller than it is wide
-                                xamnt = (x + 0.5)/ width;
-                                yamnt = (((height - y) + 0.5)/height)/aspectratio - (((height - width)/(double)width)/2);
-                            }
-                            else {
-                                // the image is square
-                                xamnt = (x + 0.5)/width;
-                                yamnt = ((height - y) + 0.5)/height;
-                            }
-                        }
-                        else {
-                            // anti-aliasing
-                            if (width > height) {
-                                // the image is wider than it is tall
-                                xamnt = ((x + (double)aax/((double)aadepth - 1))/width)*aspectratio - (((width-height)/(double)height)/2);
-                                yamnt = ((height - y) + (double)aax/((double)aadepth - 1))/height;
-                            }
-                            else if (height > width) {
-                                // the imager is taller than it is wide
-                                xamnt = (x + (double)aax/((double)aadepth - 1))/ width;
-                                yamnt = (((height - y) + (double)aax/((double)aadepth - 1))/height)/aspectratio - (((height - width)/(double)width)/2);
-                            }
-                            else {
-                                // the image is square
-                                xamnt = (x + (double)aax/((double)aadepth - 1))/width;
-                                yamnt = ((height - y) + (double)aax/((double)aadepth - 1))/height;
-                            }
-                        }
-                        
-                        Vect cam_ray_origin = scene_cam.getPosition();
-                        Vect cam_ray_direction = camdir.add(camright.mult(xamnt - 0.5).add(camdown.mult(yamnt - 0.5))).normalize();
-                        
-                        Ray cam_ray (cam_ray_origin, cam_ray_direction);
-                        
-                        vector<double> intersections;
-                        
-                        for (int index = 0; index < scene_objects.size(); index++) {
-                            intersections.push_back(scene_objects.at(index)->findIntersection(cam_ray));
-                        }
-                        
-                        int index_of_winning_object = closestObjectIndex(intersections);
-                        if (index_of_winning_object == 2){
-                            //cout << "Origin: (" << cam_ray.getRayOrigin().getVectX() << ", " << cam_ray.getRayOrigin().getVectY() << ", " << cam_ray.getRayOrigin().getVectZ() << ") ";
-                            //cout << "Direction: (" << cam_ray.getRayDirection().getVectX() << ", " << cam_ray.getRayDirection().getVectY() << ", " << cam_ray.getRayDirection().getVectZ() << ") \n";
-                        }
-                        if (index_of_winning_object == -1) {
-                            Color sky = skyColor(cam_ray_direction);
-                            tempRed[aa_index]   = sky.getRed();
-                            tempGreen[aa_index] = sky.getGreen();
-                            tempBlue[aa_index]  = sky.getBlue();
-                        }
-                        else{
-                            // index coresponds to an object in our scene
-                            if (intersections.at(index_of_winning_object) > accuracy) {
-                                // determine the position and direction vectors at the point of intersection
-                                
-                                Vect intersection_position = cam_ray_origin.add(cam_ray_direction.mult(intersections.at(index_of_winning_object)));
-                                Vect intersecting_ray_direction = cam_ray_direction;
-                                
-                                Color intersection_color = getColorAt(intersection_position, intersecting_ray_direction, scene_objects, index_of_winning_object, light_sources, accuracy, ambientlight, 5);
-                                
-                                tempRed[aa_index] = intersection_color.getRed();
-                                tempGreen[aa_index] = intersection_color.getGreen();
-                                tempBlue[aa_index] = intersection_color.getBlue();
-                            }
-                        }
-                    }
-                }
-                
-                // average the pixel color
-                double totalRed = 0;
-                double totalGreen = 0;
-                double totalBlue = 0;
-                
-                for (int iRed = 0; iRed < aadepth*aadepth; iRed++) {
-                    totalRed = totalRed + tempRed[iRed];
-                }
-                for (int iGreen = 0; iGreen < aadepth*aadepth; iGreen++) {
-                    totalGreen = totalGreen + tempGreen[iGreen];
-                }
-                for (int iBlue = 0; iBlue < aadepth*aadepth; iBlue++) {
-                    totalBlue = totalBlue + tempBlue[iBlue];
-                }
-                
-                double avgRed = totalRed/(aadepth*aadepth);
-                double avgGreen = totalGreen/(aadepth*aadepth);
-                double avgBlue = totalBlue/(aadepth*aadepth);
-                
-                pixels[thisone].r = avgRed;
-                pixels[thisone].g = avgGreen;
-                pixels[thisone].b = avgBlue;
-            }
-        }
-    }
-    
-    for (int i = 0; i < num_threads; ++i) {
-            pthread_join(t[i], NULL);
+    for (auto& t : threads) {
+        t.join();
     }
     cout << "done" << endl;
-    savebmp(filename.c_str(), width, height, dpi, pixels, n);
+    savepng(filename.c_str(), width, height, dpi, pixels, n);
 
     delete pixels;
-    t2 = clock();
-    float diff = ((float)t2 - (float )t1)/CLOCKS_PER_SEC;
+    auto t2 = std::chrono::steady_clock::now();
+    double diff = std::chrono::duration<double>(t2 - t1).count();
     cout << diff << " seconds " << endl;
     return 0; 
 }
-void Raytracer::savebmp (const char *filename, int w, int h, int dpi, RGBType *data, int size){
+void Raytracer::savepng (const char *filename, int w, int h, int dpi, RGBType *data, int size){
     cout << "SAVING \n";
     // Build raw 8-bit RGB buffer, flipping rows (renderer stores bottom-to-top)
     vector<unsigned char> buf(w * h * 3);
@@ -710,7 +515,7 @@ void Raytracer::savebmp (const char *filename, int w, int h, int dpi, RGBType *d
 
 Raytracer::Raytracer(){
     
-    t1 = clock();
+    t1 = std::chrono::steady_clock::now();
 
     dpi = 72;
     width = 640;

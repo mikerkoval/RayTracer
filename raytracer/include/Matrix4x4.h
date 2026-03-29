@@ -1,7 +1,7 @@
 #ifndef _MATRIX4X4_H
 #define _MATRIX4X4_H
 
-#include "math.h"
+#include <cmath>
 #include <iostream>
 #include <vector>
 #include <Vect.h>

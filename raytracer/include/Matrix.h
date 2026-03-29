@@ -1,7 +1,7 @@
 #ifndef _MATRIX_H
 #define _MATRIX_H
 
-#include "math.h"
+#include <cmath>
 #include "Vect.h"
 class Matrix {
     double x1, y1, z1;

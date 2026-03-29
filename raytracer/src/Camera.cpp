@@ -1,5 +1,5 @@
 #include "Camera.h"
-#include "math.h"
+#include <cmath>
 
     
 Vect Camera::getPosition(){ return campos;}

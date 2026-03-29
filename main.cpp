@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
     Vect look_at (0,    4.0,  5);
 
     // 360° Y rotation (spin around vertical axis), 90 frames
-    int total_frames = 90;
+    int total_frames = 180;
 
     cout << "Total frames: " << total_frames << endl;
 
@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 
         // Teapot: native coords centered ~(0,1.5,0), scale ~3 units tall.
         // rotateY spins it. position = world center elevated off floor.
-        TriangleMesh teapot("obj/teapot_normals.obj", Color(0.95, 0.90, 0.85, 0.2));
+        TriangleMesh teapot("obj/teapot_smooth.obj", Color(0.95, 0.90, 0.85, 0.0));
         teapot.rotateY(ry);
         teapot.position = Vect(0, 3.0, 5);
 
@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
 
         cout << "Rendering frame " << frame << "/" << total_frames << endl;
         Raytracer tracer;
-        tracer.generate(frame_objects, light_sources, filename, 1, campos, look_at, true);
+        tracer.generate(frame_objects, light_sources, filename, 2, campos, look_at, true);
     }
 
     cout << "Done." << endl;

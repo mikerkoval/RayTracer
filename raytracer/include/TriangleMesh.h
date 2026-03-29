@@ -9,8 +9,24 @@
 #include "Matrix.h"
 #include "Matrix4x4.h"
 #include <vector>
+#include <memory>
 #include "Sphere.h"
 #include "Magick++.h"
+
+struct AABB {
+    Vect min, max;
+    AABB() : min(Vect(1e18,1e18,1e18)), max(Vect(-1e18,-1e18,-1e18)) {}
+    AABB(Vect mn, Vect mx) : min(mn), max(mx) {}
+    void expand(const AABB& o);
+    double intersect(const Ray& ray) const; // returns t or -1
+};
+
+struct BVHNode {
+    AABB bounds;
+    std::unique_ptr<BVHNode> left, right;
+    std::vector<Triangle*> tris; // non-empty only in leaves
+    bool isLeaf() const { return !left; }
+};
 
 class TriangleMesh: public Object{
     Vect center;
@@ -23,7 +39,10 @@ class TriangleMesh: public Object{
     vector<Triangle> triangleOs;
     vector<Triangle*> triangles;
 
-    double boundingRadius;  // radius of bounding sphere in local space
+    double boundingRadius;
+
+    std::unique_ptr<BVHNode> bvhRoot;
+    static thread_local Triangle* lastHitTriangle;
 
     Magick::Image* texture;
     bool setText;
@@ -31,6 +50,10 @@ class TriangleMesh: public Object{
 
     void createMesh(string c);
     bool pointInTriangle(Triangle& t, Vect p);
+
+    AABB triangleAABB(Triangle* t) const;
+    std::unique_ptr<BVHNode> buildBVH(std::vector<Triangle*>& tris, int start, int end);
+    double traverseBVH(const BVHNode* node, const Ray& localRay, Triangle*& hitTri) const;
 
 public:
     TriangleMesh();

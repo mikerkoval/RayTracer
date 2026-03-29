@@ -1,6 +1,6 @@
 #include "Matrix.h"
 
-#include "math.h"
+#include <cmath>
 
 
     // method functions

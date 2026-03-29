@@ -1,7 +1,7 @@
 #ifndef _VECT_H
 #define _VECT_H
 
-#include "math.h"
+#include <cmath>
 
 class Vect {
     double x, y, z;

@@ -1,5 +1,5 @@
 #include "Matrix4x4.h"
-#include "math.h"
+#include <cmath>
 #include <iostream>
 #include <iomanip>
 #include <Eigen/Dense>

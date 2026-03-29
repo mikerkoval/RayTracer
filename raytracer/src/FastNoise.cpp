@@ -27,7 +27,7 @@
 //
 
 #include "FastNoise.h"
-#include <math.h>
+#include <cmath>
 #include <assert.h>
 #include <random>
 

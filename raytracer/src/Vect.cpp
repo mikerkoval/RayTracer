@@ -1,5 +1,5 @@
 #include "Vect.h"
-#include "math.h"
+#include <cmath>
 #include <iostream>
 
     double Vect::getX() { return x; }
