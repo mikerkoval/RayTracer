@@ -21,6 +21,7 @@ class Sphere: public Object{
     Sphere  (Vect, double,  Magick::Image*);
     //method functions
 
+    virtual bool isConvex() { return true; }
     Vect  getCenter();
     double getRadius();
     Color getColor(Vect p);

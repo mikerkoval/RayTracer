@@ -113,7 +113,7 @@ Color Raytracer::getColorAt(Vect intersection_position,Vect intersecting_directi
         vector<double> reflection_intersections;
 
         for (int reflection_index = 0; reflection_index < scene_objects.size(); reflection_index++) {
-            if (reflection_index == index_closest && scene_objects.at(reflection_index)->isPlane()) {
+            if (reflection_index == index_closest && scene_objects.at(reflection_index)->isConvex()) {
                 reflection_intersections.push_back(-1);
             } else {
                 reflection_intersections.push_back(scene_objects.at(reflection_index)->findIntersection(reflection_ray));

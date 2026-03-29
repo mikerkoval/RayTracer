@@ -22,7 +22,7 @@ class Plane: public Object{
     double getDistance();
     virtual Color getColor(Vect p);
     virtual Vect getNormalAt(Vect point );
-    virtual bool isPlane() { return true; }
+    virtual bool isConvex() { return true; }
     virtual double findIntersection(Ray ray);
 };
 

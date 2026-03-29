@@ -17,7 +17,7 @@ class Object {
 
     //method functions
     virtual bool getCL();
-    virtual bool isPlane() { return false; }
+    virtual bool isConvex() { return false; }
     virtual Color getColor(Vect p);
     virtual int move(Vect);
     virtual double findIntersection(Ray ray);

@@ -97,7 +97,7 @@ static Vect centroid(Triangle* t) {
 }
 
 unique_ptr<BVHNode> TriangleMesh::buildBVH(vector<Triangle*>& tris, int start, int end) {
-    auto node = make_unique<BVHNode>();
+    unique_ptr<BVHNode> node = make_unique<BVHNode>();
 
     // Compute bounds for this range
     for (int i = start; i < end; i++)
@@ -169,7 +169,7 @@ void TriangleMesh::createMesh(string path) {
 
     string line;
     while (getline(f, line)) {
-        auto arr = split(line, ' ');
+        vector<string> arr = split(line, ' ');
         if (arr.empty()) continue;
         if (arr[0] == "v" && arr.size() >= 4) {
             corners.push_back(Vect(stod(arr[1]), stod(arr[2]), stod(arr[3])));
@@ -178,9 +178,9 @@ void TriangleMesh::createMesh(string path) {
         } else if (arr[0] == "vn" && arr.size() >= 4) {
             vnormals.push_back(Vect(stod(arr[1]), stod(arr[2]), stod(arr[3])));
         } else if (arr[0] == "f" && arr.size() >= 4) {
-            auto pa = split(arr[1], '/');
-            auto pb = split(arr[2], '/');
-            auto pc = split(arr[3], '/');
+            vector<string> pa = split(arr[1], '/');
+            vector<string> pb = split(arr[2], '/');
+            vector<string> pc = split(arr[3], '/');
             int c1 = stoi(pa[0]) - 1;
             int c2 = stoi(pb[0]) - 1;
             int c3 = stoi(pc[0]) - 1;
@@ -205,11 +205,11 @@ void TriangleMesh::createMesh(string path) {
     }
     f.close();
 
-    for (auto& t : triangleOs) triangles.push_back(&t);
+    for (Triangle& t : triangleOs) triangles.push_back(&t);
 
     // Bounding radius in local space
     boundingRadius = 0;
-    for (auto& v : corners) {
+    for (Vect& v : corners) {
         double m = v.magnitude();
         if (m > boundingRadius) boundingRadius = m;
     }
@@ -260,7 +260,7 @@ Vect TriangleMesh::getNormalAt(Vect worldPoint) {
     }
 
     // Fallback: linear scan (should rarely happen)
-    for (auto* tp : triangles) {
+    for (Triangle* tp : triangles) {
         if (pointInTriangle(*tp, localPoint)) {
             Vect localNorm = tp->getNormalAt(localPoint);
             return tinv.mult(localNorm).normalize();
@@ -279,7 +279,7 @@ Color TriangleMesh::getColor(Vect worldPoint) {
 
     Matrix4x4 inv = buildInv(position, rotation);
     Vect localPoint = inv.mult(worldPoint);
-    for (auto* tp : triangles) {
+    for (Triangle* tp : triangles) {
         if (pointInTriangle(*tp, localPoint))
             return tp->getColor(localPoint);
     }
