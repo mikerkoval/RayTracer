@@ -144,7 +144,7 @@ double TriangleMesh::traverseBVH(const BVHNode* node, const Ray& localRay, Trian
         double best = -1;
         for (Triangle* t : node->tris) {
             double d = t->findIntersection(localRay);
-            if (d > 0.01 && (best < 0 || d < best)) {
+            if (d > 1e-6 && (best < 0 || d < best)) {
                 best = d;
                 hitTri = t;
             }
@@ -162,44 +162,141 @@ double TriangleMesh::traverseBVH(const BVHNode* node, const Ray& localRay, Trian
     return -1;
 }
 
+// ---- rebuild BVH ----
+void TriangleMesh::rebuildBVH() {
+    bvhRoot = buildBVH(triangles, 0, (int)triangles.size());
+}
+
+// ---- MTL loader ----
+void TriangleMesh::loadMtl(const string& path, const string& baseDir) {
+    ifstream f(path);
+    if (!f.is_open()) { cout << "Warning: cannot open MTL: " << path << "\n"; return; }
+
+    string line;
+    int cur = -1;
+    while (getline(f, line)) {
+        // strip carriage returns
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        vector<string> arr = split(line, ' ');
+        if (arr.empty() || arr[0].empty() || arr[0][0] == '#') continue;
+
+        if (arr[0] == "newmtl" && arr.size() >= 2) {
+            materials.push_back(MtlMaterial());
+            cur = (int)materials.size() - 1;
+            // store name temporarily in a lookup handled below
+        } else if (cur < 0) {
+            continue;
+        } else if (arr[0] == "Kd" && arr.size() >= 4) {
+            materials[cur].kd = Color(stod(arr[1]), stod(arr[2]), stod(arr[3]), 0);
+        } else if (arr[0] == "Ks" && arr.size() >= 4) {
+            // use luminance of Ks as specularity
+            materials[cur].ks = (stod(arr[1]) + stod(arr[2]) + stod(arr[3])) / 3.0;
+        } else if (arr[0] == "Ns" && arr.size() >= 2) {
+            materials[cur].ns = stod(arr[1]);
+        } else if (arr[0] == "Ni" && arr.size() >= 2) {
+            materials[cur].ni = stod(arr[1]);
+        } else if (arr[0] == "d" && arr.size() >= 2) {
+            materials[cur].d = stod(arr[1]);
+        } else if (arr[0] == "map_Kd" && arr.size() >= 2) {
+            string texpath = baseDir + "/" + arr[1];
+            try {
+                materials[cur].map_kd = make_unique<ImageTexture>(texpath);
+            } catch (...) {
+                cout << "Warning: could not load texture: " << texpath << "\n";
+            }
+        }
+    }
+}
+
 // ---- OBJ loader ----
 void TriangleMesh::createMesh(string path) {
     ifstream f(path);
     if (!f.is_open()) { cout << "Unable to open file: " << path << "\n"; return; }
 
+    // Derive base directory for resolving relative MTL/texture paths
+    string baseDir = ".";
+    size_t lastSlash = path.find_last_of("/\\");
+    if (lastSlash != string::npos) baseDir = path.substr(0, lastSlash);
+
+    // MTL name -> index map
+    unordered_map<string, int> mtlIndex;
+    int currentMtl = -1;  // -1 = no material assigned yet
+
     string line;
     while (getline(f, line)) {
+        // strip carriage returns
+        if (!line.empty() && line.back() == '\r') line.pop_back();
         vector<string> arr = split(line, ' ');
         if (arr.empty()) continue;
-        if (arr[0] == "v" && arr.size() >= 4) {
+        if (arr[0] == "mtllib" && arr.size() >= 2) {
+            string mtlpath = baseDir + "/" + arr[1];
+            int baseMtlIdx = (int)materials.size();
+            loadMtl(mtlpath, baseDir);
+            // Rebuild name index after loading (we use insertion order)
+            // Names are stored sequentially; re-parse the MTL for names only
+            ifstream mf(mtlpath);
+            string ml;
+            int mi = baseMtlIdx;
+            while (getline(mf, ml)) {
+                if (!ml.empty() && ml.back() == '\r') ml.pop_back();
+                vector<string> ma = split(ml, ' ');
+                if (ma.size() >= 2 && ma[0] == "newmtl") {
+                    mtlIndex[ma[1]] = mi++;
+                }
+            }
+        } else if (arr[0] == "usemtl" && arr.size() >= 2) {
+            auto it = mtlIndex.find(arr[1]);
+            currentMtl = (it != mtlIndex.end()) ? it->second : -1;
+        } else if (arr[0] == "v" && arr.size() >= 4) {
             corners.push_back(Vect(stod(arr[1]), stod(arr[2]), stod(arr[3])));
         } else if (arr[0] == "vt" && arr.size() >= 3) {
             textures.push_back(Vect(stod(arr[1]), stod(arr[2]), 0));
         } else if (arr[0] == "vn" && arr.size() >= 4) {
             vnormals.push_back(Vect(stod(arr[1]), stod(arr[2]), stod(arr[3])));
         } else if (arr[0] == "f" && arr.size() >= 4) {
-            vector<string> pa = split(arr[1], '/');
-            vector<string> pb = split(arr[2], '/');
-            vector<string> pc = split(arr[3], '/');
-            int c1 = stoi(pa[0]) - 1;
-            int c2 = stoi(pb[0]) - 1;
-            int c3 = stoi(pc[0]) - 1;
-            int n1 = stoi(pa[2]) - 1;
-            int n2 = stoi(pb[2]) - 1;
-            int n3 = stoi(pc[2]) - 1;
+            // Parse all face vertices (supports quads and n-gons)
+            struct FaceVert { int v, vt, vn; };
+            vector<FaceVert> fverts;
+            for (int i = 1; i < (int)arr.size(); i++) {
+                if (arr[i].empty()) continue;
+                vector<string> p = split(arr[i], '/');
+                FaceVert fv;
+                fv.v  = stoi(p[0]) - 1;
+                fv.vt = (p.size() > 1 && !p[1].empty()) ? stoi(p[1]) - 1 : -1;
+                fv.vn = (p.size() > 2 && !p[2].empty()) ? stoi(p[2]) - 1 : -1;
+                fverts.push_back(fv);
+            }
 
-            if (setText && pa.size() > 1 && !pa[1].empty()) {
-                int t1 = stoi(pa[1]) - 1;
-                int t2 = stoi(pb[1]) - 1;
-                int t3 = stoi(pc[1]) - 1;
-                triangleOs.push_back(Triangle(
-                    &corners[c1], &corners[c2], &corners[c3],
-                    vnormals[n1], vnormals[n2], vnormals[n3],
-                    textures[t1], textures[t2], textures[t3], texture));
-            } else {
-                triangleOs.push_back(Triangle(
-                    &corners[c1], &corners[c2], &corners[c3],
-                    vnormals[n1], vnormals[n2], vnormals[n3], color));
+            // Fan triangulation: (0,1,2), (0,2,3), (0,3,4), ...
+            for (int i = 1; i + 1 < (int)fverts.size(); i++) {
+                FaceVert& fa = fverts[0];
+                FaceVert& fb = fverts[i];
+                FaceVert& fc = fverts[i + 1];
+
+                bool hasNormals = fa.vn >= 0 && fb.vn >= 0 && fc.vn >= 0;
+                bool hasUVs     = fa.vt >= 0 && fb.vt >= 0 && fc.vt >= 0;
+
+                Vect na = hasNormals ? vnormals[fa.vn] : Vect(0,1,0);
+                Vect nb = hasNormals ? vnormals[fb.vn] : Vect(0,1,0);
+                Vect nc = hasNormals ? vnormals[fc.vn] : Vect(0,1,0);
+
+                // Use old Magick texture path only if explicitly set via constructor
+                if (setText && texture && hasUVs) {
+                    triangleOs.push_back(Triangle(
+                        &corners[fa.v], &corners[fb.v], &corners[fc.v],
+                        na, nb, nc,
+                        textures[fa.vt], textures[fb.vt], textures[fc.vt], texture));
+                } else {
+                    triangleOs.push_back(Triangle(
+                        &corners[fa.v], &corners[fb.v], &corners[fc.v],
+                        na, nb, nc, color));
+                }
+                // Store UV coords and material index for MTL texturing
+                triMaterial.push_back(currentMtl);
+                Vect uva = hasUVs ? textures[fa.vt] : Vect(0,0,0);
+                Vect uvb = hasUVs ? textures[fb.vt] : Vect(0,0,0);
+                Vect uvc = hasUVs ? textures[fc.vt] : Vect(0,0,0);
+                triUVs.push_back({uva, uvb, uvc});
             }
         }
     }
@@ -233,8 +330,9 @@ double TriangleMesh::findIntersection(Ray ray) {
     Vect p1 = p0.add(ray.getDirection());
     Vect lp0 = inv.mult(p0);
     Vect lp1 = inv.mult(p1);
-    Vect ldir = lp1.add(lp0.negative()).normalize();
-    Ray localRay(lp0, ldir);
+    Vect ldir = lp1.add(lp0.negative());
+    double ldir_len = ldir.magnitude();
+    Ray localRay(lp0, ldir.normalize());
 
     // Bounding sphere early-out
     Sphere bsphere(Vect(0,0,0), boundingRadius, Color());
@@ -243,7 +341,8 @@ double TriangleMesh::findIntersection(Ray ray) {
     Triangle* hitTri = nullptr;
     double best = traverseBVH(bvhRoot.get(), localRay, hitTri);
     lastHitTriangle = hitTri;
-    return best;
+    // Convert local-space t back to world-space t
+    return best > 0 ? best / ldir_len : best;
 }
 
 // ---- getNormalAt ----
@@ -271,19 +370,48 @@ Vect TriangleMesh::getNormalAt(Vect worldPoint) {
 
 // ---- getColor ----
 Color TriangleMesh::getColor(Vect worldPoint) {
-    if (lastHitTriangle) {
-        Matrix4x4 inv = buildInv(position, rotation);
-        Vect localPoint = inv.mult(worldPoint);
-        return lastHitTriangle->getColor(localPoint);
-    }
-
     Matrix4x4 inv = buildInv(position, rotation);
     Vect localPoint = inv.mult(worldPoint);
-    for (Triangle* tp : triangles) {
-        if (pointInTriangle(*tp, localPoint))
-            return tp->getColor(localPoint);
+
+    Triangle* tri = lastHitTriangle;
+    if (!tri) {
+        for (Triangle* tp : triangles) {
+            if (pointInTriangle(*tp, localPoint)) { tri = tp; break; }
+        }
     }
-    return Color(1, 1, 1, 0);
+    if (!tri) return color;
+
+    // Find triangle index
+    int idx = (int)(tri - &triangleOs[0]);
+
+    // Try MTL material first
+    if (idx >= 0 && idx < (int)triMaterial.size()) {
+        int mi = triMaterial[idx];
+        if (mi >= 0 && mi < (int)materials.size()) {
+            MtlMaterial& mat = materials[mi];
+            if (mat.map_kd) {
+                // Interpolate UV using barycentric coords
+                Vect n = tri->getTriangleNormal();
+                Vect A = tri->getA(), B = tri->getB(), C = tri->getC();
+                Vect ba = B.add(A.negative()).negative();
+                Vect ca = C.add(A.negative()).negative();
+                Vect bp = B.add(localPoint.negative()).negative();
+                Vect cp = C.add(localPoint.negative()).negative();
+                Vect ap = A.add(localPoint.negative()).negative();
+                double areaABC = fabs(n.dotProduct(ba.crossProduct(ca)));
+                double u = fabs(n.dotProduct(bp.crossProduct(cp))) / areaABC;
+                double v = fabs(n.dotProduct(cp.crossProduct(ap))) / areaABC;
+                double w = 1.0 - u - v;
+                auto& uvs = triUVs[idx];
+                double tu = uvs[0].getX()*u + uvs[1].getX()*v + uvs[2].getX()*w;
+                double tv = uvs[0].getY()*u + uvs[1].getY()*v + uvs[2].getY()*w;
+                return mat.map_kd->getColor(tu, 1.0 - tv);
+            }
+            return mat.kd;
+        }
+    }
+
+    return tri->getColor(localPoint);
 }
 
 // ---- point-in-triangle (local space) — kept as fallback ----

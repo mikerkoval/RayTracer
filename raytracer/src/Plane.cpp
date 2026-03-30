@@ -2,15 +2,20 @@
 
 Vect  Plane::getNormal(){return normal;}
 double Plane::getDistance(){return distance;}
-Color Plane::getColor(Vect p){return color;}
+Color Plane::getColor(Vect p){
+    if (texture) {
+        return texture->getColor(p.getX(), p.getZ());
+    }
+    return color;
+}
 Vect Plane::getNormalAt(Vect point ){
     return normal;
 }
 double Plane::findIntersection(Ray ray) {
     Vect ray_direction = ray.getDirection();
-    
+
     double a = ray_direction.dotProduct(normal);
-    
+
     if (a <.0001 && a > -.0001) {
         // ray is parallel to the plane
         return -1;
@@ -27,11 +32,11 @@ Plane::Plane(){
     normal = Vect(1,0,0);
     distance  = 1;
     color = Color(.5,.5,.5,0);
-   
+
 }
 
 Plane::Plane(Vect n, double  d, Color col){
     normal = n;
-    distance = d; 
+    distance = d;
     color = col;
 }

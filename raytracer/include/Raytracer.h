@@ -33,6 +33,8 @@ struct RGBType {
     double g;
     double b;
 };
+
+enum class ToneMap { None, Reinhard, ACES };
 class Raytracer {
 
     std::chrono::steady_clock::time_point t1;
@@ -75,9 +77,9 @@ class Raytracer {
     static Color getColorAt(Vect intersection_position,Vect intersecting_direction, vector<Object*> scene_objects, int index_closest,vector<Source*> light_sources,double  accuracy,double ambientlight, int n);
 
 
-    int generate (vector<Object*> objs, vector<Source*>lights, std::string filename, int aa, Vect, Vect, bool);
+    int generate (vector<Object*> objs, vector<Source*>lights, std::string filename, int aa, Vect, Vect, bool, ToneMap tonemap = ToneMap::None, double gamma = 1.0, double ambient = 0.35);
 
-    void savepng (const char *filename, int w, int h, int dpi, RGBType *data, int size);
+    void savepng (const char *filename, int w, int h, int dpi, RGBType *data, int size, ToneMap tonemap, double gamma);
 
 
 };

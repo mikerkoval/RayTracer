@@ -40,5 +40,11 @@ void Object::scale(double x, double y, double z){
 
 Object::Object(){
     clearLight = false;
+    texture = nullptr;
+    normalMap = nullptr;
+    shininess = 0.0;
+    ior = 0.0;
+    transparency = 0.0;
+    emission = Color(0, 0, 0, 0);
 }
 

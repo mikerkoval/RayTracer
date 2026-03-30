@@ -1,0 +1,33 @@
+{
+  "camera": {
+    "position": [0, 2.4, -6.0],
+    "look_at": [0, 0.5, 0],
+    "aa": 1,
+    "tonemapping": "none",
+    "gamma": 1.0
+  },
+  "lights": [
+    { "position": [-1, 8, -3], "color": [1.0, 1.0, 1.0], "radius": 0.3, "intensity": 8 }
+  ],
+  "objects": [
+    {
+      "type": "quad",
+      "center": [0, -0.952, 0],
+      "width": 20.0,
+      "depth": 20.0,
+      "color": [0.75, 0.75, 0.75],
+      "specularity": 0.0,
+      "shininess": 120
+    },
+    {
+      "type": "mesh",
+      "path": "obj/cartoon_statue/model.obj",
+      "color": [0.8, 0.7, 0.6],
+      "specularity": 0.1,
+      "shininess": 20,
+      "transform": [
+        { "translate": [0, 1.0, 0] }
+      ]
+    }
+  ]
+}

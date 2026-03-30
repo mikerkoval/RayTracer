@@ -25,6 +25,7 @@ class Sphere: public Object{
     Vect  getCenter();
     double getRadius();
     Color getColor(Vect p);
+    void getUV(Vect worldPoint, double& u, double& v);
     void scale(double);
     virtual int move(Vect m);
     virtual Vect getNormalAt(Vect point);

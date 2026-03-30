@@ -8,17 +8,23 @@ class Light : public Source {
 
     Vect position;
     Color color;
+    double radius;
 
     public:
 
-    Light();
+    // intensity > 0 enables inverse-square falloff; intensity is the brightness at distance 1
+    double intensity;
 
-    Light  (Vect, Color);
+    Light();
+    Light(Vect, Color);
+    Light(Vect, Color, double radius);
 
     //method functions
 
     virtual Vect getPosition();
     virtual Color getColor();
+    virtual double getRadius();
+    virtual double getIntensity() { return intensity; }
 };
 
 #endif

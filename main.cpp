@@ -1,73 +1,54 @@
 
 #include "Raytracer.h"
+#include "SceneLoader.h"
+#include "TriangleMesh.h"
 #include <iostream>
 #include <cmath>
 #include <sstream>
 #include <iomanip>
 #include <sys/stat.h>
-#include "Plane.h"
-#include "Light.h"
-#include "Rectangle.h"
-#include "Pyramid.h"
-#include "Cone.h"
-#include "Cylinder.h"
-#include "TriangleMesh.h"
-#include "Matrix.h"
 
 using namespace std;
 
 int main(int argc, char *argv[]) {
 
     mkdir("output", 0755);
+    mkdir("output/statue_spin", 0755);
 
-    // --- Lights ---
-    vector<Source*> light_sources;
-    Light key_light  (Vect(-6, 10, -4), Color(0.6, 0.6, 0.6, 0));
-    light_sources.push_back(dynamic_cast<Source*>(&key_light));
+    // Load scene once — mesh is built once and reused every frame
+    Scene scene = SceneLoader::load("scenes/statue_test.json");
 
-    // --- Static scene ---
-    vector<Object*> scene_objects;
+    // Find the mesh object (index 1 — after the floor quad)
+    Object* mesh = nullptr;
+    for (auto* obj : scene.object_ptrs) {
+        if (dynamic_cast<TriangleMesh*>(obj)) { mesh = obj; break; }
+    }
 
-    Plane floor     (Vect( 0,  1,  0),   0,  Color(0.80, 0.75, 0.60, 0.05));
-    Plane ceiling   (Vect( 0, -1,  0),  -16, Color(0.02, 0.02, 0.02, 0.0));
-    Plane back_wall (Vect( 0,  0, -1),  -20, Color(0.30, 0.35, 0.65, 0.0));
-    Plane left_wall (Vect( 1,  0,  0),  -12, Color(0.65, 0.15, 0.15, 0.0));
-    Plane right_wall(Vect(-1,  0,  0),  -12, Color(0.15, 0.55, 0.25, 0.0));
-
-    scene_objects.push_back(dynamic_cast<Object*>(&floor));
-    scene_objects.push_back(dynamic_cast<Object*>(&ceiling));
-    scene_objects.push_back(dynamic_cast<Object*>(&back_wall));
-    scene_objects.push_back(dynamic_cast<Object*>(&left_wall));
-    scene_objects.push_back(dynamic_cast<Object*>(&right_wall));
-
-    // Camera lower and more forward to catch blue back-wall reflections when cone is inverted
-    Vect campos  (1.5, 10.0, -6);
-    Vect look_at (0,    4.0,  5);
-
-    // 360° Y rotation (spin around vertical axis), 90 frames
-    int total_frames = 180;
+    int total_frames = 120;
+    double degrees_per_frame = 2.0 * M_PI / total_frames;
 
     cout << "Total frames: " << total_frames << endl;
 
+    Vect campos(0, 2.4, -6.0);
+    Vect lookat(0, 0.5, 0);
+
     for (int frame = 0; frame < total_frames; frame++) {
-        double ry = 2.0 * M_PI * frame / total_frames;
-
-        // Teapot: native coords centered ~(0,1.5,0), scale ~3 units tall.
-        // rotateY spins it. position = world center elevated off floor.
-        TriangleMesh teapot("obj/teapot_smooth.obj", Color(0.95, 0.90, 0.85, 0.0));
-        teapot.rotateY(ry);
-        teapot.position = Vect(0, 3.0, 5);
-
-        vector<Object*> frame_objects = scene_objects;
-        frame_objects.push_back(dynamic_cast<Object*>(&teapot));
+        // Reset rotation and apply exact angle for this frame
+        if (mesh) {
+            mesh->rotation = Matrix4x4();
+            mesh->inverse  = Matrix4x4();
+            mesh->rotateY(degrees_per_frame * frame);
+        }
 
         ostringstream ss;
-        ss << "output/frame" << setw(4) << setfill('0') << frame << ".png";
-        string filename = ss.str();
+        ss << "output/statue_spin/frame" << setw(4) << setfill('0') << frame << ".png";
 
-        cout << "Rendering frame " << frame << "/" << total_frames << endl;
+        cout << "Frame " << frame << "/" << total_frames << endl;
+
         Raytracer tracer;
-        tracer.generate(frame_objects, light_sources, filename, 2, campos, look_at, true);
+        tracer.generate(scene.object_ptrs, scene.light_ptrs, ss.str(),
+                        scene.aa, campos, lookat, true,
+                        scene.tonemap, scene.gamma, scene.ambient);
     }
 
     cout << "Done." << endl;

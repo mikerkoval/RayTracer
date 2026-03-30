@@ -19,7 +19,7 @@ class Pyramid: public Object{
     vector<Vect> corners;
     vector<Triangle*> triangles;
     vector<Triangle> triangleOs;
-    int last_hit_index;
+    static thread_local int last_hit_index;
 
     public:
 

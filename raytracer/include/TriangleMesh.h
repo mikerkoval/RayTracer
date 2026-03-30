@@ -8,10 +8,22 @@
 #include "Ray.h"
 #include "Matrix.h"
 #include "Matrix4x4.h"
+#include "Texture.h"
 #include <vector>
+#include <array>
 #include <memory>
+#include <unordered_map>
 #include "Sphere.h"
 #include "Magick++.h"
+
+struct MtlMaterial {
+    Color kd { 0.8, 0.8, 0.8, 0 };
+    double ks  { 0.5 };
+    double ns  { 0.0 };
+    double ni  { 1.0 };
+    double d   { 1.0 };
+    std::unique_ptr<ImageTexture> map_kd;
+};
 
 struct AABB {
     Vect min, max;
@@ -39,6 +51,11 @@ class TriangleMesh: public Object{
     vector<Triangle> triangleOs;
     vector<Triangle*> triangles;
 
+    // MTL materials and per-triangle material index + UVs
+    vector<MtlMaterial> materials;
+    vector<int> triMaterial;              // parallel to triangleOs
+    vector<array<Vect,3>> triUVs;        // UV coords per triangle vertex
+
     double boundingRadius;
 
     std::unique_ptr<BVHNode> bvhRoot;
@@ -49,6 +66,8 @@ class TriangleMesh: public Object{
     bool clearLight;
 
     void createMesh(string c);
+    void loadMtl(const string& path, const string& baseDir);
+    void rebuildBVH();
     bool pointInTriangle(Triangle& t, Vect p);
 
     AABB triangleAABB(Triangle* t) const;

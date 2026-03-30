@@ -3,6 +3,8 @@
 #include "Matrix4x4.h"
 #include <iostream>
 using namespace std;
+
+thread_local int Pyramid::last_hit_index = 0;
 bool Pyramid::pointInTriangle(Triangle t, Vect p){
     Vect normal = t.getNormalAt(p);
     Vect A = t.getA();
@@ -119,7 +121,6 @@ Pyramid::Pyramid(){
     sides = 3;
     radius = 1;
     height = 1;
-    last_hit_index = 0;
     createPyramid();
 }
 
@@ -129,6 +130,5 @@ Pyramid::Pyramid(Vect position, double s , double r, double h, Color col){
     radius = r;
     height = h;
     color = col;
-    last_hit_index = 0;
     createPyramid();
 }

@@ -6,13 +6,20 @@
 #include "Color.h"
 #include "Matrix.h"
 #include "Matrix4x4.h"
+#include "Texture.h"
 class Object {
-    
+
     public:
     Matrix4x4 rotation;
     Matrix4x4 inverse;
     Vect position;
     bool clearLight;
+    Texture* texture;
+    NormalMapTexture* normalMap;
+    double shininess;     // Phong exponent, 0 = no specular highlight
+    double ior;           // index of refraction, 0 = opaque
+    double transparency;  // 0 = opaque, 1 = fully transparent
+    Color emission;       // emissive color, black = no emission
     Object();
 
     //method functions

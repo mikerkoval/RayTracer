@@ -5,7 +5,21 @@ using namespace std;
 
 Vect Sphere::getCenter(){return center;}
 double Sphere::getRadius(){return radius;}
+
+void Sphere::getUV(Vect worldPoint, double& u, double& v) {
+    Vect local = inverse.mult(worldPoint.add(center.negative())).normalize();
+    double theta   = acos(max(-1.0, min(1.0, local.getY())));
+    double epsilon = atan2(local.getZ(), local.getX()) + M_PI;
+    u = epsilon / (2.0 * M_PI);
+    v = theta  / M_PI;
+}
+
 Color Sphere::getColor(Vect p){
+    if (Object::texture) {
+        double u, v;
+        getUV(p, u, v);
+        return Object::texture->getColor(u, v);
+    }
     if(texture){
          p = inverse.mult(p);
          p = p.normalize();
@@ -111,8 +125,6 @@ void Sphere::rotateY(double s){
     m.rotateY(s);
     rotation = m.mult(rotation);
     inverse = rotation.inverse();
-
-
 }
 
 void Sphere::rotateX(double s){

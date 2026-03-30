@@ -1,0 +1,41 @@
+{
+  "ambient": 0.0,
+  "camera": {
+    "position": [0, 2.0, -4.5],
+    "look_at": [0, 2.0, 0],
+    "aa": 1,
+    "tonemapping": "none",
+    "gamma": 1.0
+  },
+  "lights": [],
+  "objects": [
+    // floor
+    { "type": "quad", "center": [0, 0, 0], "width": 8.0, "depth": 10.0,
+      "color": [0.80, 0.76, 0.68], "specularity": 0.05, "shininess": 20 },
+
+    // emissive ceiling light panel
+    { "type": "quad", "center": [0, 3.99, 0], "width": 2.0, "depth": 2.0,
+      "color": [1.0, 0.95, 0.85], "emission": [1.0, 0.95, 0.85],
+      "transform": [{ "rotateX": 3.14159265 }] },
+
+    // ceiling
+    { "type": "quad", "center": [0, 4.0, 0], "width": 8.0, "depth": 10.0,
+      "color": [0.80, 0.76, 0.68], "specularity": 0.0, "shininess": 0,
+      "transform": [{ "rotateX": 3.14159265 }] },
+
+    // back wall — normal points toward camera (-Z)
+    { "type": "quad", "center": [0, 2.0, 5.0], "width": 8.0, "depth": 4.0,
+      "color": [0.80, 0.76, 0.68], "specularity": 0.0, "shininess": 0,
+      "transform": [{ "rotateX": -1.5707963 }] },
+
+    // left wall — normal points right (+X)
+    { "type": "quad", "center": [-4.0, 2.0, 0], "width": 4.0, "depth": 10.0,
+      "color": [0.80, 0.76, 0.68], "specularity": 0.0, "shininess": 0,
+      "transform": [{ "rotateZ": -1.5707963 }] },
+
+    // right wall — normal points left (-X)
+    { "type": "quad", "center": [4.0, 2.0, 0], "width": 4.0, "depth": 10.0,
+      "color": [0.80, 0.76, 0.68], "specularity": 0.0, "shininess": 0,
+      "transform": [{ "rotateZ": 1.5707963 }] }
+  ]
+}
