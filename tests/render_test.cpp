@@ -276,8 +276,8 @@ static void scene_image_texture(const string& outpath) {
     tracer.generate(objects, lights, outpath, 1, campos, lookat, true);
 }
 
-// Showcase: reflective spheres on checkerboard, three colored lights with soft shadows
-static void scene_showcase(const string& outpath) {
+// Spheres: reflective spheres on checkerboard, three colored lights with soft shadows
+static void scene_spheres(const string& outpath) {
     vector<Source*> lights;
     // Warm key light — upper left
     Light key(Vect(-8, 12, -6), Color(1.0, 0.75, 0.45, 0), 0.5);
@@ -368,7 +368,7 @@ int main(int argc, char* argv[]) {
     else if (scene == "noise_value")              scene_noise_value(outpath);
     else if (scene == "noise_cellular")           scene_noise_cellular(outpath);
     else if (scene == "mesh")                  scene_mesh(outpath);
-    else if (scene == "showcase")              scene_showcase(outpath);
+    else if (scene == "spheres")               scene_spheres(outpath);
     else {
         cerr << "Unknown scene: " << scene << "\n";
         return 1;

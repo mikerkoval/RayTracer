@@ -34,7 +34,7 @@ target_link_libraries(noise_preview raytracer ${ImageMagick_LIBRARIES})
 set(REFS_DIR ${CMAKE_SOURCE_DIR}/tests/references)
 set(COMPARE_SCRIPT ${CMAKE_SOURCE_DIR}/tests/compare.sh)
 
-foreach(SCENE sphere_plain sphere_shadow sphere_two sphere_two_reflective sphere_soft_shadow cone cylinder rectangle pyramid quad checkerboard image_texture noise_simplex noise_simplex_fractal noise_value noise_cellular mesh showcase)
+foreach(SCENE sphere_plain sphere_shadow sphere_two sphere_two_reflective sphere_soft_shadow cone cylinder rectangle pyramid quad checkerboard image_texture noise_simplex noise_simplex_fractal noise_value noise_cellular mesh spheres)
     add_test(
         NAME test_${SCENE}
         COMMAND bash ${COMPARE_SCRIPT} $<TARGET_FILE:render_test> ${SCENE} ${REFS_DIR}

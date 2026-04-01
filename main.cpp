@@ -13,10 +13,10 @@ using namespace std;
 int main(int argc, char *argv[]) {
 
     mkdir("output", 0755);
-    mkdir("output/statue_spin", 0755);
+    mkdir("output/book_spin", 0755);
 
     // Load scene once — mesh is built once and reused every frame
-    Scene scene = SceneLoader::load("scenes/statue_test.json");
+    Scene scene = SceneLoader::load("scenes/book_test.json");
 
     // Find the mesh object (index 1 — after the floor quad)
     Object* mesh = nullptr;
@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
         }
 
         ostringstream ss;
-        ss << "output/statue_spin/frame" << setw(4) << setfill('0') << frame << ".png";
+        ss << "output/book_spin/frame" << setw(4) << setfill('0') << frame << ".png";
 
         cout << "Frame " << frame << "/" << total_frames << endl;
 
