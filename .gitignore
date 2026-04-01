@@ -24,6 +24,10 @@ pictures/
 *.gif
 *.bmp
 
+# Keep examples assets
+!examples/*.gif
+!examples/*.png
+
 # IDE / editor
 .vscode/
 .idea/

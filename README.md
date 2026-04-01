@@ -6,17 +6,9 @@ A multithreaded CPU raytracer written in C++ that renders photorealistic scenes 
 
 ## Gallery
 
-| Sphere reflections | Mesh render | Procedural noise |
+| Book | Fresnel | Mesh |
 |---|---|---|
-| ![Reflections](tests/references/sphere_two_reflective.png) | ![Mesh](tests/references/mesh.png) | ![Noise](tests/references/noise_simplex_fractal.png) |
-
-| Image texture | Cellular noise | Checkerboard |
-|---|---|---|
-| ![Texture](tests/references/image_texture.png) | ![Cellular](tests/references/noise_cellular.png) | ![Checker](tests/references/checkerboard.png) |
-
-| Book animation | Fresnel animation |
-|---|---|
-| ![Book spin](examples/output.gif) | ![Fresnel](examples/fresnel_animation.gif) |
+| ![Book](examples/book.gif) | ![Fresnel](examples/fresnel.gif) | ![Mesh](examples/mesh.gif) |
 
 
 
