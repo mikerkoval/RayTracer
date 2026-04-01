@@ -8,7 +8,7 @@ A multithreaded CPU raytracer written in C++ that renders photorealistic scenes 
 
 | Book | Fresnel | Mesh |
 |---|---|---|
-| ![Book](examples/book.gif) | ![Fresnel](examples/fresnel.gif) | ![Mesh](examples/mesh.gif) |
+| <img src="examples/book.gif" width="300"/> | <img src="examples/fresnel.gif" width="300"/> | <img src="examples/mesh.gif" width="300"/> |
 
 
 
